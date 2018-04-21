@@ -71,8 +71,8 @@ public class OneclassSVM {
             result[i] = predict(points[i]);
             if(result[i] == 1) count_normal ++;
         }
-        System.out.println("Normal: " + count_normal + "/" + points.length);
-        System.out.println("Abnormal: " + (points.length - count_normal) + "/" + points.length);
+//        System.out.println("Normal: " + count_normal + "/" + points.length);
+//        System.out.println("Abnormal: " + (points.length - count_normal) + "/" + points.length);
         return result;
     }
 }

@@ -3,6 +3,7 @@ package net.floodlightcontroller.test;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import net.floodlightcontroller.OCSVM.DataPoint;
+import net.floodlightcontroller.OCSVM.OneclassSVM;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
@@ -59,7 +60,7 @@ public class ClientSocket implements IFloodlightModule {
         gson = new Gson();
         servSocket = new ServerSocket(DEFAULT_PORT);
         switchService = context.getServiceImpl(IOFSwitchService.class);
-        System.out.println("Start server Socket");
+        log.info("Start server Socket");
     }
 
     @Override
@@ -83,12 +84,17 @@ public class ClientSocket implements IFloodlightModule {
                     System.out.println(data);
                     DataModel dataModel = gson.fromJson(data,DataModel.class);
                     DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
-
-                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
-                    sendFlowDeleteMessage(z);
+                    OneclassSVM oneclassSVM = new OneclassSVM();
+                    double result = oneclassSVM.predict(dataPoint);
+                    if(result > 0){
+                        log.info("Normal");
+                    }else
+                        log.info("Abnormal");
+//                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
+//                    sendFlowDeleteMessage(z);
                 }
             } catch (IOException e) {
-                System.out.println("Cannot communicate to client!");
+                log.info("Cannot communicate to client!");
             }
         } catch (IOException e) {
             e.printStackTrace();
