@@ -1,12 +1,15 @@
 package net.floodlightcontroller.test;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
+import net.floodlightcontroller.OCSVM.DataPoint;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.fuzzy.Fuzzy;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
@@ -29,6 +32,7 @@ public class ClientSocket implements IFloodlightModule {
     private final static int DEFAULT_PORT = 9999;
     private static ServerSocket servSocket;
     private Socket socket;
+    private Gson gson;
     private static IOFSwitchService switchService;
 
     @Override
@@ -52,6 +56,7 @@ public class ClientSocket implements IFloodlightModule {
 
     @Override
     public void init(FloodlightModuleContext context) throws FloodlightModuleException, IOException {
+        gson = new Gson();
         servSocket = new ServerSocket(DEFAULT_PORT);
         switchService = context.getServiceImpl(IOFSwitchService.class);
         System.out.println("Start server Socket");
@@ -72,10 +77,14 @@ public class ClientSocket implements IFloodlightModule {
         try {
             ObjectInputStream in = new ObjectInputStream(connSocket.getInputStream());
 
-            double z;
+            String data;
             try {
-                while ((z = in.readDouble()) != -1) {
-                    System.out.println(z);
+                while ((data = in.readUTF()) != null) {
+                    System.out.println(data);
+                    DataModel dataModel = gson.fromJson(data,DataModel.class);
+                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
+
+                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
                     sendFlowDeleteMessage(z);
                 }
             } catch (IOException e) {

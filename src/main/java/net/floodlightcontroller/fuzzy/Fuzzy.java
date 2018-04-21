@@ -34,167 +34,86 @@ import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.statistics.StatisticsCollector;
 
-public class Fuzzy implements IFloodlightModule, IOFMessageListener {
-	private static IOFSwitchService switchService;
-	public final static int DEFAULT_PORT = 5000;
-	public static ServerSocket servSocket;
-	public static java.net.Socket socket;
-	static Logger logger = Logger.getLogger(Fuzzy.class.getName());
-	static Double Z1 = (double) 50;
-	static Double Z2 = (double) 98;
-	static Double Z3 = (double) 80;
-	@Override
-	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	@Override
-	public Map<Class<? extends IFloodlightService>, IFloodlightService> getServiceImpls() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+public class Fuzzy {
+	public static double FIS(double A1, double A2) {
+		double z = 0;
+		double a = 0.0;
+		double b = 0.0;
+		double c = 0.07;
+		double d = 0.9;
+		double a1 = 0.07;
+		double b1 = 0.9;
+		double c1 = 1.0;
+		double d1 = 1.0;
+		double e = 0.0;
+		double f = 0.0;
+		double g = 0.05;
+		double h = 0.8;
+		double e1 = 0.05;
+		double f1 = 0.8;
+		double g1 = 1.0;
+		double h1 = 1.0;
+		double A,B,C,D;
 
-	@Override
-	public Collection<Class<? extends IFloodlightService>> getModuleDependencies() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+		if (b - a == 0) A = 1000;
+		else A = (A1 - a) / (b - a);
+		if (b1 - a1 == 0) C = 1000;
+		else C = (A1 - a1) / (b1 - a1);
+		if (d - c == 0) B = 1000;
+		else B = (d - A1) / (d - c);
+		if (d1 - c1 == 0) D = 1000;
+		else D = (d1 - A1) / (d1 - c1);
 
-	@Override
-	public void init(FloodlightModuleContext context) throws FloodlightModuleException, IOException {
-		// TODO Auto-generated method stub
-		// Tạo ServerSocket lắng nghe trên port 5000
-		servSocket = new ServerSocket(DEFAULT_PORT);
-		System.out.println("start server Socket");
-	}
-//	public void sendFlowDeleteMessage(double z) {
-//		try {
-//			Integer dem = 0;
-//			logger.info(dem.toString());
-//			dem++;
-//		} catch (Exception e) {
-//			// TODO: handle exception
-//			System.out.println(e.toString());
-//		}
-//		StatisticsCollector statisticsCollector = (StatisticsCollector) switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-//		Map<DatapathId, List<OFStatsReply>> replies = statisticsCollector.getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.FLOW);
-//		int numberFlowDeleted = 0;
-//		for (Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
-//		for (OFStatsReply r : e.getValue()) {
-//		OFFlowStatsReply fsr = (OFFlowStatsReply) r ;
-//		List<OFFlowStatsEntry> list = fsr.getEntries();
-//		//Sắp xếp các flow từ nhỏ đến lớn theo số gói tin của flow sử dụng HeapSort
-//		sort(list);
-//		for (OFFlowStatsEntry fse : list) {
-//		Match match = fse.getMatch();
-//		numberFlowDeleted++;
-//		//Kiểm tra xem số flow bị delete đã đủ số Z chưa
-//		if(numberFlowDeleted*1.0/list.size() < z){
-//
-//		// listMatch.add(match);
-//		OFFactory myFactory = OFFactories.getFactory(OFVersion.OF_10);
-//		IOFSwitch sw = switchService.getSwitch(e.getKey());
-//
-//		//Build bản tin FlowDelete
-//		OFFlowDelete flowDelete = myFactory.buildFlowDelete()
-//		.setCookie(fse.getCookie()).setMatch(match).build();
-//		
-//		//gửi bản tin FlowDelete xuống Switch
-//		sw.write(flowDelete);
-//					}	
-//		else return;
-//				}
-//			}
-//		}
-// 	}
-//
-//	public static void sort(List<OFFlowStatsEntry> IP) {
-//		int n = IP.size();
-//		for (int i = n / 2 - 1; i >= 0; i--) {
-//			heapify(IP, n, i);
-//		}
-//
-//		// Heap sort
-//		for (int i = n - 1; i >= 0; i--) {
-//			OFFlowStatsEntry temp = IP.get(0);
-//			IP.set(0,IP.get(i));
-//			IP.set(i,temp);
-//			// Heapify root element
-//			heapify( IP, i, 0);
-//		}
-//	}
-//	public static void heapify(List<OFFlowStatsEntry> IP, int n,int i) {
-//		int largest = i;
-//		int l = 2 * i + 1; // ben trai
-//		int r = 2 * i + 2;  // ben phai
-//		if (l < n && IP.get(l).getPacketCount().getValue() > IP.get(largest).getPacketCount().getValue()) {
-//			largest = l;
-//		}
-//		if (r < n && IP.get(r).getPacketCount().getValue() > IP.get(largest).getPacketCount().getValue()) {
-//			largest = r;
-//		}
-//		if (largest != i) {
-//			OFFlowStatsEntry swap = IP.get(i);
-//			IP.set(i,IP.get(largest));
-//			IP.set(largest,swap);
-//			heapify(IP, n, largest);
-//		}
-//	}
+		double q1 = min(A, 1.0);
+		double Z3 = min(q1, B);
+		double Fl1 = max(Z3, 0.0);
+		double q2 = min(C, 1.0);
+		double Z4 = min(q2, D);
+		double Fh1 = max(Z4, 0.0);
+		double E;
+		double F;
+		double G;
+		double H;
+		if (f - e == 0) E = 1000;
+		else  E = (A2 - e) / (f - e);
+		if (f1 - e1 == 0) G = 1000;
+		else G = (A2 - e1) / (f1 - e1);
+		if (h - g == 0) F = 1000;
+		else F = (h - A2) / (h - g);
+		if (h1 - g1 == 0) H = 1000;
+		else H = (h1 - A2) / (h1 - g1);
+		double q3 = min(E, 1.0); double Z1 = min(q3, F);
+		double Fl2 = max(Z1, 0.0); double q4 = min(G, 1.0);
+		double Z2 = min(q4, H); double Fh2 = max(Z2, 0.0);
+		double W1 = min(Fl1, Fl2); double W2 = min(Fl1, Fh2);
+		double W3 = min(Fh1, Fl2); double W4 = min(Fh1, Fh2);
 
-	@Override
-	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-		// TODO Auto-generated method stub
-		System.out.println("Begin module Fuzzy");
-//		while(true)
-//		{
-//			sendFlowDeleteMessage(Z1);
-//		}
-		while (true){
-			try{
-			socket = servSocket.accept();
-			communicate(socket);
-			} catch (IOException e){
-			System.out.println(e.getMessage());
-			}
+		if (((A1 >= 0.99) && (A1 <= 1.0)) || ((A2 >= 0.9) && (A2 <= 1.0))) {
+			z = 1;
+		} else if (((A1 >= 0.0) && (A1 <= 0.8)) && ((A2 >= 0.0) && (A2 <= 0.15)))
+		{
+			z = 0;
+		} else {
+			z = (W2 + W3 + W4) / (W1 + W2 + W3 + W4);
 		}
+		return z;
 	}
-	private void communicate(java.net.Socket connSocket){
-		try {
-			ObjectInputStream in = new ObjectInputStream(connSocket.getInputStream());
-			Double z;
-			try{
-				while((z = in.readDouble()) != 0) {
-					System.out.println(z);
-					// Đọc số Z từ collector gửi lên
-					//			StatisticsCollector statisticsCollector = new StatisticsCollector();
-					//			statisticsCollector.sendFlowDeleteMessage(z);// Delete Flow theo tham số Z
-				logger.info(z.toString());
-				}
-			} catch(IOException e){
-				System.out.println("Client stopped sending data");
-			}
-		} catch(IOException e){
-			System.out.println("Cannot communicate to client");
-		}	
+	private static double max(double t1, double t2) {
+		double t3 = 0;
+		if (t1 < t2) {
+			t3 = t2;
+		} else {
+			t3 = t1;
+		}
+		return t3;
 	}
-	@Override
-	public String getName() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	@Override
-	public boolean isCallbackOrderingPrereq(OFType type, String name) {
-		// TODO Auto-generated method stub
-		return false;
-	}
-	@Override
-	public boolean isCallbackOrderingPostreq(OFType type, String name) {
-		// TODO Auto-generated method stub
-		return false;
-	}
-	@Override
-	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
-		// TODO Auto-generated method stub
-		return null;
+	private static double min(double t1, double t2) {
+		double t3 = 0;
+		if (t1 < t2) {
+			t3 = t1;
+		} else {
+			t3 = t2;
+		}
+		return t3;
 	}
 }
