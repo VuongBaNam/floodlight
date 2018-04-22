@@ -4,19 +4,23 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import net.floodlightcontroller.OCSVM.DataPoint;
 import net.floodlightcontroller.OCSVM.OneclassSVM;
+import net.floodlightcontroller.accesscontrollist.ACLRule;
+import net.floodlightcontroller.accesscontrollist.IACLService;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.forwarding.Forwarding;
 import net.floodlightcontroller.fuzzy.Fuzzy;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
+import net.floodlightcontroller.util.FlowModUtils;
 import org.projectfloodlight.openflow.protocol.*;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.match.Match;
-import org.projectfloodlight.openflow.types.DatapathId;
-import org.projectfloodlight.openflow.types.OFPort;
-import org.projectfloodlight.openflow.types.TableId;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
+import org.projectfloodlight.openflow.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,12 +33,14 @@ import java.util.concurrent.TimeUnit;
 
 public class ClientSocket implements IFloodlightModule {
 
+    private boolean check = false;
     private static final Logger log = LoggerFactory.getLogger(ClientSocket.class);
     private final static int DEFAULT_PORT = 9999;
     private static ServerSocket servSocket;
     private Socket socket;
     private Gson gson;
-    private static IOFSwitchService switchService;
+    private IOFSwitchService switchService;
+    private IACLService iaclService;
 
     @Override
     public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -60,6 +66,7 @@ public class ClientSocket implements IFloodlightModule {
         gson = new Gson();
         servSocket = new ServerSocket(DEFAULT_PORT);
         switchService = context.getServiceImpl(IOFSwitchService.class);
+        iaclService = context.getServiceImpl(IACLService.class);
         log.info("Start server Socket");
     }
 
@@ -68,11 +75,12 @@ public class ClientSocket implements IFloodlightModule {
         while (true){
             try{
                 socket = servSocket.accept();
-                //communicate(socket);
+//                communicate(socket);
             } catch (IOException e){
                 System.out.println(e.getMessage());
             }
         }
+
     }
     private void communicate(Socket connSocket) {
         try {
@@ -92,6 +100,9 @@ public class ClientSocket implements IFloodlightModule {
                         log.info("Abnormal");
 //                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
 //                    sendFlowDeleteMessage(z);
+//                    if(dataModel.getRATE_ICMP() > 0.7 || dataModel.P_IAT > 0.9){
+//                        doDropFlowICMP();
+//                    }
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
@@ -101,7 +112,25 @@ public class ClientSocket implements IFloodlightModule {
         }
     }
 
-    public void sendFlowDeleteMessage(double z) {
+    private void doDropFlowICMP(){
+        for(DatapathId datapathId : switchService.getAllSwitchDpids()){
+            IOFSwitch sw = switchService.getSwitch(datapathId);
+            OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
+            Match match = sw.getOFFactory().buildMatch()
+                    .setExact(MatchField.ETH_TYPE, EthType.IPv4)
+                    .setExact(MatchField.IP_PROTO, IpProtocol.ICMP)
+                    .build();;
+            System.out.println(match.get(MatchField.IP_PROTO));
+            List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
+            fmb.setMatch(match).setIdleTimeout(Forwarding.FLOWMOD_DEFAULT_IDLE_TIMEOUT);
+
+            FlowModUtils.setActions(fmb, actions, sw);
+
+            sw.write(fmb.build());
+        }
+    }
+
+    private void sendFlowDeleteMessage(double z) {
 
         Map<DatapathId, List<OFStatsReply>> replies = getAllFlowStatistics(switchService.getAllSwitchDpids());
         int numberFlowDeleted = 0;
@@ -139,7 +168,7 @@ public class ClientSocket implements IFloodlightModule {
         System.out.println("---------------------------------------------");
         System.out.println(numberFlowDeleted +" "+ numberFlow);
     }
-    public static void sort(List<OFFlowStatsEntry> IP) {
+    private static void sort(List<OFFlowStatsEntry> IP) {
         int n = IP.size();
         for (int i = n / 2 - 1; i >= 0; i--) {
             heapify(IP, n, i);
@@ -165,7 +194,7 @@ public class ClientSocket implements IFloodlightModule {
         }
     }
 
-    public static void heapify(List<OFFlowStatsEntry> IP, int n,int i) {
+    private static void heapify(List<OFFlowStatsEntry> IP, int n,int i) {
         int largest = i;
         int l = 2 * i + 1; // ben trai
         int r = 2 * i + 2;  // ben phai
@@ -193,7 +222,7 @@ public class ClientSocket implements IFloodlightModule {
         }
     }
 
-    Map<DatapathId, List<OFStatsReply>> getAllFlowStatistics(Set<DatapathId> dpids ){
+    private Map<DatapathId, List<OFStatsReply>> getAllFlowStatistics(Set<DatapathId> dpids ){
         Map<DatapathId, List<OFStatsReply>> map = new HashMap<>();
         for (DatapathId d : dpids) {
             List<OFStatsReply> list = getFlowStatistics(d);

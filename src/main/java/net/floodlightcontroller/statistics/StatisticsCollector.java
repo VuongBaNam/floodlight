@@ -12,15 +12,16 @@ import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import net.floodlightcontroller.accesscontrollist.ACLRule;
 import net.floodlightcontroller.test.Header;
 import net.floodlightcontroller.test.Item;
+import net.floodlightcontroller.util.FlowModUtils;
 import org.projectfloodlight.openflow.protocol.*;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.match.Match;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.ver13.OFMeterSerializerVer13;
-import org.projectfloodlight.openflow.types.DatapathId;
-import org.projectfloodlight.openflow.types.OFPort;
-import org.projectfloodlight.openflow.types.TableId;
-import org.projectfloodlight.openflow.types.U64;
+import org.projectfloodlight.openflow.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,50 +84,68 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	private class PortStatsCollector implements Runnable {
 
 		public void sendFlowDeleteMessage(double z) {
+			for(DatapathId datapathId : switchService.getAllSwitchDpids()){
+				IOFSwitch sw = switchService.getSwitch(datapathId);
+				OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
+				Match match = sw.getOFFactory().buildMatch()
+						.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+						.setExact(MatchField.IP_PROTO, IpProtocol.ICMP)
+						.build();;
+				System.out.println(match.get(MatchField.IP_PROTO));
+				List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
+				fmb.setMatch(match);
 
-			Map<DatapathId, List<OFStatsReply>> replies = getSwitchStatistics(switchService.getAllSwitchDpids(),OFStatsType.FLOW);
-			int numberFlowDeleted = 0;
-			int numberFlow = 0;
-			for (Map.Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
-				for (OFStatsReply r : e.getValue()) {
-					OFFlowStatsReply fsr = (OFFlowStatsReply) r;
+				FlowModUtils.setActions(fmb, actions, sw);
 
-					List<Item> itemList = new ArrayList<Item>();
-					List<OFFlowStatsEntry> list = fsr.getEntries();
-					System.out.println("No Sort:");
-					for (OFFlowStatsEntry fse : list) {
-						Item item = new Item();
-						item.setAttribute(Header.COOKIE.toString(),fse.getCookie());
-						item.setAttribute(Header.MATCH.toString(),fse.getMatch());
-						item.setAttribute(Header.PACKET_COUNT.toString(),fse.getPacketCount());
-						itemList.add(item);
-					}
-					sort(itemList);
-					System.out.println("Sorted:");
-					for (Item item : itemList) {
-						U64 cookie = (U64)item.getFieldValue(Header.COOKIE.toString());
-						U64 packet = (U64)item.getFieldValue(Header.PACKET_COUNT.toString());
-						System.out.println(cookie.getValue() +" "+packet.getValue());
-					}
-					numberFlow = list.size();
-					for (OFFlowStatsEntry fse : list) {
-						Match match = fse.getMatch();
-
-						if(numberFlowDeleted*1.0/numberFlow < z){
-							IOFSwitch sw = switchService.getSwitch(e.getKey());
-
-							OFFlowDelete flowDelete = sw.getOFFactory().buildFlowDelete()
-									.setTableId(TableId.ALL)
-									.setOutPort(OFPort.ANY)
-									.setMatch(match).build();
-							sw.write(flowDelete);
-							numberFlowDeleted++;
-						}
-					}
-				}
+				sw.write(fmb.build());
 			}
-			System.out.println("---------------------------------------------");
-			System.out.println(numberFlowDeleted +" "+ numberFlow);
+
+
+//			Map<DatapathId, List<OFStatsReply>> replies = getSwitchStatistics(switchService.getAllSwitchDpids(),OFStatsType.FLOW);
+//			int numberFlowDeleted = 0;
+//			int numberFlow = 0;
+//			for (Map.Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
+//				for (OFStatsReply r : e.getValue()) {
+//					OFFlowStatsReply fsr = (OFFlowStatsReply) r;
+//
+//					List<Item> itemList = new ArrayList<Item>();
+//					List<OFFlowStatsEntry> list = fsr.getEntries();
+//					System.out.println("No Sort:");
+//					for (OFFlowStatsEntry fse : list) {
+//						Item item = new Item();
+//						item.setAttribute(Header.COOKIE.toString(),fse.getCookie());
+//						item.setAttribute(Header.MATCH.toString(),fse.getMatch());
+//						item.setAttribute(Header.PACKET_COUNT.toString(),fse.getPacketCount());
+//						itemList.add(item);
+//					}
+//					sort(itemList);
+//					System.out.println("Sorted:");
+//					for (Item item : itemList) {
+//						U64 cookie = (U64)item.getFieldValue(Header.COOKIE.toString());
+//						U64 packet = (U64)item.getFieldValue(Header.PACKET_COUNT.toString());
+//						System.out.println(cookie.getValue() +" "+packet.getValue());
+//					}
+//					IOFSwitch sw = switchService.getSwitch(e.getKey());
+//					numberFlow = list.size();
+//					for (OFFlowStatsEntry fse : list) {
+//						Match match = fse.getMatch();
+//
+//						if(numberFlowDeleted*1.0/numberFlow < z){
+//
+//
+//							OFFlowDelete flowDelete = sw.getOFFactory().buildFlowDelete()
+//									.setTableId(TableId.ALL)
+//									.setOutPort(OFPort.ANY)
+//									.setMatch(match)
+//									.build();
+//							sw.write(flowDelete);
+//							numberFlowDeleted++;
+//						}
+//					}
+//				}
+//			}
+//			System.out.println("---------------------------------------------");
+//			System.out.println(numberFlowDeleted +" "+ numberFlow);
 		}
 		public void sort(List<Item> IP) {
 			int n = IP.size();
@@ -168,7 +187,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 
 		@Override
 		public void run() {
-			sendFlowDeleteMessage(0.5);
+			//sendFlowDeleteMessage(0.5);
 		}
 	}
 	/**

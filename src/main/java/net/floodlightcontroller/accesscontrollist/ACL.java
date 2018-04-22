@@ -150,6 +150,8 @@ public class ACL implements IACLService, IFloodlightModule, IDeviceListener {
 		}
 		aclRules.put(rule.getId(), rule);
 		logger.info("ACL rule(id:{}) is added.", rule.getId());
+		logger.info("ACL action is ", rule.getAction());
+
 		if (rule.getAction() != Action.ALLOW) {
 			enforceAddedRule(rule);
 		}
@@ -263,8 +265,7 @@ public class ACL implements IACLService, IFloodlightModule, IDeviceListener {
 						Integer.toString(rule.getTp_dst()));
 			}
 
-			storageSource
-					.insertRowAsync(StaticFlowEntryPusher.TABLE_NAME, flow);
+			storageSource.insertRowAsync(StaticFlowEntryPusher.TABLE_NAME, flow);
 
 		} else {
 
@@ -351,7 +352,7 @@ public class ACL implements IACLService, IFloodlightModule, IDeviceListener {
 
 	@Override
 	public void deviceAdded(IDevice device) {
-		SwitchPort[] switchPort = device.getAttachmentPoints(); 
+		SwitchPort[] switchPort = device.getAttachmentPoints();
 		if (switchPort.length == 0) {
                         //Device manager does not yet know an attachment point for a device (Bug Fix) 
                         return;

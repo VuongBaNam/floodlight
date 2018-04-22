@@ -323,7 +323,7 @@ public class StatsReplySerializer extends JsonSerializer<StatsReply> {
 
 		jGen.writeFieldName("groupFeatures");
 		jGen.writeStartObject();                        
-		jGen.writeNumberField("capabilities",groupFeaturesReply.getC());
+		jGen.writeNumberField("capabilities",groupFeaturesReply.getCapabilities().size());
 		jGen.writeNumberField("maxGroupsAll",groupFeaturesReply.getMaxGroupsAll());
 		jGen.writeNumberField("maxGroupsSelect",groupFeaturesReply.getMaxGroupsSelect());
 		jGen.writeNumberField("maxGroupsIndirect",groupFeaturesReply.getMaxGroupsIndirect());
@@ -413,7 +413,7 @@ public class StatsReplySerializer extends JsonSerializer<StatsReply> {
 		for (OFMeterConfig config : meterConfigReply.getEntries()) {
 			jGen.writeStartObject();
 			jGen.writeNumberField("meterId", config.getMeterId());
-			jGen.writeNumberField("flags", config.getFlags());
+			jGen.writeNumberField("flags", config.getFlags().size());
 			jGen.writeFieldName("meterBands");
 			jGen.writeStartArray();
 			for (OFMeterBand band : config.getEntries()) {
