@@ -35,7 +35,7 @@ public class OneclassSVM {
 
     private void setSvmModel(){
         try {
-            svmModel = svm.svm_load_model("mySVMmodel_6s_DTL.txt");
+            svmModel = svm.svm_load_model("E:\\hoc tap\\floodlight\\mySVMmodel_6s_DTL.txt");
         } catch (IOException e) {
             e.printStackTrace();
         }

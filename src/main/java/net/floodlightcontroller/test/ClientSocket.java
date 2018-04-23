@@ -34,7 +34,7 @@ public class ClientSocket implements IFloodlightModule {
 
     private boolean check = false;
     private static final Logger log = LoggerFactory.getLogger(ClientSocket.class);
-    private final static int DEFAULT_PORT = 9999;
+    private final static int DEFAULT_PORT = 5000;
     private static ServerSocket servSocket;
     private Socket socket;
     private Gson gson;
@@ -84,20 +84,29 @@ public class ClientSocket implements IFloodlightModule {
     private void communicate(Socket connSocket) {
         try {
             ObjectInputStream in = new ObjectInputStream(connSocket.getInputStream());
-            BufferedInputStream bin = new BufferedInputStream(in);
 
-            String data;
+            byte[] data = new byte[1500];
             try {
-                while ((data = in.readUTF()) != null) {
-                    System.out.println(data);
-//                    DataModel dataModel = gson.fromJson(data,DataModel.class);
-//                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
-//                    OneclassSVM oneclassSVM = new OneclassSVM();
-//                    double result = oneclassSVM.predict(dataPoint);
-//                    if(result > 0){
-//                        log.info("Normal");
-//                    }else
-//                        log.info("Abnormal");
+                while ((in.read(data)) != -1) {
+
+                    StringBuilder json = new StringBuilder();
+                    for(int i = 0;i < data.length;i++) {
+                        if(data[i] != 0){
+                            json.append(new Character((char)data[i]));
+                            if('}' == (char)data[i]){
+                                break;
+                            }
+                        }
+                    }
+                    System.out.println(json);
+                    DataModel dataModel = gson.fromJson(json.toString(),DataModel.class);
+                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
+                    OneclassSVM oneclassSVM = new OneclassSVM();
+                    double result = oneclassSVM.predict(dataPoint);
+                    if(result > 0){
+                        log.info("Normal");
+                    }else
+                        log.info("Abnormal");
 ////                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
 ////                    sendFlowDeleteMessage(z);
 ////                    if(dataModel.getRATE_ICMP() > 0.7 || dataModel.P_IAT > 0.9){
