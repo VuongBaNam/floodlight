@@ -24,8 +24,7 @@ import org.projectfloodlight.openflow.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
@@ -75,7 +74,7 @@ public class ClientSocket implements IFloodlightModule {
         while (true){
             try{
                 socket = servSocket.accept();
-//                communicate(socket);
+                communicate(socket);
             } catch (IOException e){
                 System.out.println(e.getMessage());
             }
@@ -85,24 +84,25 @@ public class ClientSocket implements IFloodlightModule {
     private void communicate(Socket connSocket) {
         try {
             ObjectInputStream in = new ObjectInputStream(connSocket.getInputStream());
+            BufferedInputStream bin = new BufferedInputStream(in);
 
             String data;
             try {
                 while ((data = in.readUTF()) != null) {
                     System.out.println(data);
-                    DataModel dataModel = gson.fromJson(data,DataModel.class);
-                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
-                    OneclassSVM oneclassSVM = new OneclassSVM();
-                    double result = oneclassSVM.predict(dataPoint);
-                    if(result > 0){
-                        log.info("Normal");
-                    }else
-                        log.info("Abnormal");
-//                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
-//                    sendFlowDeleteMessage(z);
-//                    if(dataModel.getRATE_ICMP() > 0.7 || dataModel.P_IAT > 0.9){
-//                        doDropFlowICMP();
-//                    }
+//                    DataModel dataModel = gson.fromJson(data,DataModel.class);
+//                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
+//                    OneclassSVM oneclassSVM = new OneclassSVM();
+//                    double result = oneclassSVM.predict(dataPoint);
+//                    if(result > 0){
+//                        log.info("Normal");
+//                    }else
+//                        log.info("Abnormal");
+////                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
+////                    sendFlowDeleteMessage(z);
+////                    if(dataModel.getRATE_ICMP() > 0.7 || dataModel.P_IAT > 0.9){
+////                        doDropFlowICMP();
+////                    }
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
