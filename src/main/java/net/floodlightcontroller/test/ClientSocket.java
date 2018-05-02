@@ -74,7 +74,7 @@ public class ClientSocket implements IFloodlightModule {
         while (true){
             try{
                 socket = servSocket.accept();
-                communicate(socket);
+                //communicate(socket);
             } catch (IOException e){
                 System.out.println(e.getMessage());
             }
@@ -105,13 +105,20 @@ public class ClientSocket implements IFloodlightModule {
                     double result = oneclassSVM.predict(dataPoint);
                     if(result > 0){
                         log.info("Normal");
-                    }else
+                    }else {
+                        doDropFlowICMP();
                         log.info("Abnormal");
-////                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
-////                    sendFlowDeleteMessage(z);
-////                    if(dataModel.getRATE_ICMP() > 0.7 || dataModel.P_IAT > 0.9){
-////                        doDropFlowICMP();
-////                    }
+                    }
+                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
+                    sendFlowDeleteMessage(z);
+                    if(dataModel.getRATE_ICMP() > 0.7 && dataModel.P_IAT > 0.8){
+                        log.info("Attack ICMP");
+                        doDropFlowICMP();
+                    }
+                    if(dataModel.getAverageSize() > 450 || dataModel.getNumberOfPackets() > 6000){
+                        log.info("Attack DNS");
+                        doDropFlowDNS();
+                    }
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
@@ -121,11 +128,28 @@ public class ClientSocket implements IFloodlightModule {
         }
     }
 
+    private void doDropFlowDNS(){
+        for(DatapathId datapathId : switchService.getAllSwitchDpids()){
+            IOFSwitch sw = switchService.getSwitch(datapathId);
+            OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
+            Match match = sw.getOFFactory().buildMatch()
+                    .setExact(MatchField.UDP_SRC,TransportPort.of(53))
+                    .build();
+            List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
+            fmb.setMatch(match).setIdleTimeout(Forwarding.FLOWMOD_DEFAULT_IDLE_TIMEOUT);
+
+            FlowModUtils.setActions(fmb, actions, sw);
+
+            sw.write(fmb.build());
+        }
+    }
+
     private void doDropFlowICMP(){
         for(DatapathId datapathId : switchService.getAllSwitchDpids()){
             IOFSwitch sw = switchService.getSwitch(datapathId);
             OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
             Match match = sw.getOFFactory().buildMatch()
+
                     .setExact(MatchField.ETH_TYPE, EthType.IPv4)
                     .setExact(MatchField.IP_PROTO, IpProtocol.ICMP)
                     .build();;
