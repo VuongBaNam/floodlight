@@ -89,6 +89,7 @@ public class ClientSocket implements IFloodlightModule {
             try {
                 while ((in.read(data)) != -1) {
 
+                    // Xử lý dữ liệu đầu vào
                     StringBuilder json = new StringBuilder();
                     for(int i = 0;i < data.length;i++) {
                         if(data[i] != 0){
@@ -98,27 +99,30 @@ public class ClientSocket implements IFloodlightModule {
                             }
                         }
                     }
-                    System.out.println(json);
-                    DataModel dataModel = gson.fromJson(json.toString(),DataModel.class);
-                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
-                    OneclassSVM oneclassSVM = new OneclassSVM();
-                    double result = oneclassSVM.predict(dataPoint);
-                    if(result > 0){
-                        log.info("Normal");
-                    }else {
-                        doDropFlowICMP();
-                        log.info("Abnormal");
+//                    System.out.println(json);
+//                    // Chạy module OCSVM
+                    Data dataModel = gson.fromJson(json.toString(),Data.class);
+//                    DataPoint dataPoint = new DataPoint(dataModel.getNumberOfPackets(),dataModel.getAverageSize());
+//                    OneclassSVM oneclassSVM = new OneclassSVM();
+//                    double result = oneclassSVM.predict(dataPoint);
+//                    if(result > 0){
+//                        log.info("Normal");
+//                    }else {
+//                        doDropFlowICMP();
+//                        log.info("Abnormal");
+//                    }
+                    //Run module Fuzzy
+                    double z = Fuzzy.FIS(dataModel.getPPF(),dataModel.P_IAT);
+                    if(z > 0) {
+                        sendFlowDeleteMessage(z);
+                    }else if(z == 1){
+                        sendTableDeleteMessage();
                     }
-                    double z = Fuzzy.FIS(dataModel.getRATE_ICMP(),dataModel.P_IAT);
-                    sendFlowDeleteMessage(z);
-                    if(dataModel.getRATE_ICMP() > 0.7 && dataModel.P_IAT > 0.8){
-                        log.info("Attack ICMP");
-                        doDropFlowICMP();
-                    }
-                    if(dataModel.getAverageSize() > 450 || dataModel.getNumberOfPackets() > 6000){
-                        log.info("Attack DNS");
-                        doDropFlowDNS();
-                    }
+//                    // Run module DNS
+//                    if(dataModel.getAverageSize() > 450 || dataModel.getNumberOfPackets() > 6000){
+//                        log.info("Attack DNS");
+//                        doDropFlowDNS();
+//                    }
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
@@ -149,7 +153,6 @@ public class ClientSocket implements IFloodlightModule {
             IOFSwitch sw = switchService.getSwitch(datapathId);
             OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
             Match match = sw.getOFFactory().buildMatch()
-
                     .setExact(MatchField.ETH_TYPE, EthType.IPv4)
                     .setExact(MatchField.IP_PROTO, IpProtocol.ICMP)
                     .build();;
@@ -163,6 +166,18 @@ public class ClientSocket implements IFloodlightModule {
         }
     }
 
+    private void sendTableDeleteMessage() {
+        Set<DatapathId> datapathIds = switchService.getAllSwitchDpids();
+        for(DatapathId datapathId : datapathIds) {
+            IOFSwitch sw = switchService.getSwitch(datapathId);
+
+            OFFlowDelete flowDelete = sw.getOFFactory().buildFlowDelete()
+                    .setTableId(TableId.ALL)
+                    .setOutPort(OFPort.ANY).build();
+            sw.write(flowDelete);
+        }
+    }
+
     private void sendFlowDeleteMessage(double z) {
 
         Map<DatapathId, List<OFStatsReply>> replies = getAllFlowStatistics(switchService.getAllSwitchDpids());
@@ -172,12 +187,7 @@ public class ClientSocket implements IFloodlightModule {
             for (OFStatsReply r : e.getValue()) {
                 OFFlowStatsReply fsr = (OFFlowStatsReply) r;
                 List<OFFlowStatsEntry> list = fsr.getEntries();
-                System.out.println("No Sort:");
-                for (OFFlowStatsEntry fse : list) {
-                    System.out.println(fse.getCookie().getValue() +" "+ fse.getPacketCount().getValue());
-                }
                 sort(list);
-                System.out.println("Sorted:");
                 for (OFFlowStatsEntry fse : list) {
                     System.out.println(fse.getCookie().getValue() +" "+ fse.getPacketCount().getValue());
                 }
