@@ -39,17 +39,17 @@ public class Fuzzy {
 		double z = 0;
 		double a = 0.0;
 		double b = 0.0;
-		double c = 0.07;
-		double d = 0.9;
-		double a1 = 0.07;
-		double b1 = 0.9;
+		double c = 0.4;
+		double d = 0.95;
+		double a1 = 0.4;
+		double b1 = 0.95;
 		double c1 = 1.0;
 		double d1 = 1.0;
 		double e = 0.0;
 		double f = 0.0;
-		double g = 0.05;
+		double g = 0.35;
 		double h = 0.8;
-		double e1 = 0.05;
+		double e1 = 0.35;
 		double f1 = 0.8;
 		double g1 = 1.0;
 		double h1 = 1.0;
@@ -88,9 +88,9 @@ public class Fuzzy {
 		double W1 = min(Fl1, Fl2); double W2 = min(Fl1, Fh2);
 		double W3 = min(Fh1, Fl2); double W4 = min(Fh1, Fh2);
 
-		if (((A1 >= 0.99) && (A1 <= 1.0)) || ((A2 >= 0.9) && (A2 <= 1.0))) {
+		if (((A1 >= 0.95) && (A1 <= 1.0)) || ((A2 >= 0.95) && (A2 <= 1.0))) {
 			z = 1;
-		} else if (((A1 >= 0.0) && (A1 <= 0.8)) && ((A2 >= 0.0) && (A2 <= 0.15)))
+		} else if (((A1 >= 0.0) && (A1 <= 0.35)) && ((A2 >= 0.0) && (A2 <= 0.35)))
 		{
 			z = 0;
 		} else {

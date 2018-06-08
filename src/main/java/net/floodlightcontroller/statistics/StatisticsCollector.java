@@ -90,14 +90,14 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 				Match match = sw.getOFFactory().buildMatch()
 						.setExact(MatchField.ETH_TYPE, EthType.IPv4)
 						.setExact(MatchField.IP_PROTO, IpProtocol.ICMP)
-						.build();;
-				System.out.println(match.get(MatchField.IP_PROTO));
+						.build();
 				List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
 				fmb.setMatch(match);
 
 				FlowModUtils.setActions(fmb, actions, sw);
 
 				sw.write(fmb.build());
+				System.out.println(fmb.build());
 			}
 
 
@@ -187,7 +187,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 
 		@Override
 		public void run() {
-			//sendFlowDeleteMessage(0.5);
+			sendFlowDeleteMessage(0.5);
 		}
 	}
 	/**
@@ -322,7 +322,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 * Start all stats threads.
 	 */
 	private void startStatisticsCollection() {
-		portStatsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new PortStatsCollector(), portStatsInterval, portStatsInterval, TimeUnit.SECONDS);
+		//portStatsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new PortStatsCollector(), portStatsInterval, portStatsInterval, TimeUnit.SECONDS);
 		tentativePortStats.clear(); /* must clear out, otherwise might have huge BW result if present and wait a long time before re-enabling stats */
 		log.warn("Statistics collection thread(s) started");
 	}

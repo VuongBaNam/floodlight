@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName;
 
 public class Data {
     @SerializedName("MaxRateProtol")
-    protected double maxRateProtol;
+    protected String maxRateProtol;
     @SerializedName("PpF")
     protected double PPF;
     @SerializedName("IAT")
@@ -13,17 +13,17 @@ public class Data {
     public Data() {
     }
 
-    public Data(double maxRateProtol, double PPF, double p_IAT) {
+    public Data(String maxRateProtol, double PPF, double p_IAT) {
         this.maxRateProtol = maxRateProtol;
         this.PPF = PPF;
         P_IAT = p_IAT;
     }
 
-    public double getMaxRateProtol() {
+    public String getMaxRateProtol() {
         return maxRateProtol;
     }
 
-    public void setMaxRateProtol(double maxRateProtol) {
+    public void setMaxRateProtol(String maxRateProtol) {
         this.maxRateProtol = maxRateProtol;
     }
 
