@@ -89,7 +89,7 @@ public class ClientSocket implements IFloodlightModule {
             try {
                 while ((in.read(data)) != -1) {
 
-                    // Xử lý dữ liệu đầu vào
+                    // Xử lý dữ liệu đầu vào được gửi từ analyzer
                     StringBuilder json = new StringBuilder();
                     for(int i = 0;i < data.length;i++) {
                         if(data[i] != 0){
@@ -101,52 +101,50 @@ public class ClientSocket implements IFloodlightModule {
                     }
                     System.out.println(json);
                     if (json.toString().contains("null")) continue;
-//                    System.out.println(json);
-//                    // Chạy module OCSVM
                     DataModel dataModel = gson.fromJson(json.toString(),DataModel.class);
-                    DataPoint dataPoint = new DataPoint(dataModel.getTOTAL_PKT(),dataModel.getPKT_SIZE_AVG());
-                    OneclassSVM oneclassSVM = new OneclassSVM();
-                    double result = oneclassSVM.predict(dataPoint);
-                    if(result > 0){
-                        log.info("Normal");
-                    }else {
-                        doDropFlowICMP();
-                        log.info("Abnormal");
-                    }
-                    //Run module Fuzzy
-//                    double z = Fuzzy.FIS(dataModel.getPPF(),dataModel.P_IAT);
-//                    if(z > 0.8 && z < 1) {
-//                        System.out.println("z > 0.8");
-//                        if(dataModel.maxRateProtol.equals("ICMP")){
-//                            System.out.println( "drop ICMP");
-//                            doDropFlowICMP();
-//                        }else {
-//                            System.out.println("del TCP");
-//                            sendFlowDeleteMessage(z);
-//                        }
-//                    }else if(z == 1){
-//                        if(dataModel.maxRateProtol.equals("ICMP")){
-//                            System.out.println( "drop ICMP");
-//                            doDropFlowICMP();
-//                        }else {
-//                            System.out.println("delete TCP");
-//                            sendTableDeleteMessage();
-//                        }
-//                    }else if (z > 0 && dataModel.maxRateProtol.equals("TCP")){
-//                        System.out.println("TCP"+z);
-//                        sendFlowDeleteMessage(z);
-//                    }
-                    // Run module DNS
-                    if(dataModel.getRATE_DNSRESPONE() > 450 || dataModel.getTOTAL_DNSRESPONE() > 6000){
-                        log.info("Attack DNS");
-                        doDropFlowDNS();
-                    }
+
+                    //Module OCSVM và giải pháp dropICMP
+                    OCSVM(dataModel.getTOTAL_PKT(),dataModel.getPKT_SIZE_AVG());
+
+                    //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
+                    Fuzzy(dataModel.getPPF(),dataModel.getP_IAT());
+
+                    //Module DNS và giải pháp chặn bản tin DNS response
+                    DNS(dataModel.getRATE_DNSRESPONE(),dataModel.getTOTAL_DNSRESPONE());
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void DNS(double rateDNS,double totalDNS){
+        if(rateDNS > 0.5 || totalDNS > 6000){
+            log.info("Attack DNS");
+            doDropFlowDNS();
+        }
+    }
+
+    private void OCSVM(double numberOfPackets, double averageSize){
+        DataPoint dataPoint = new DataPoint(numberOfPackets,averageSize);
+        OneclassSVM oneclassSVM = new OneclassSVM();
+        double result = oneclassSVM.predict(dataPoint);
+        if(result > 0){
+            log.info("Normal");
+        }else {
+            doDropFlowICMP();
+            log.info("Abnormal");
+        }
+    }
+
+    private void Fuzzy(double PPF,double P_IAT){
+        double z = Fuzzy.FIS(PPF,P_IAT);
+        if(z > 0.95){
+            sendTableDeleteMessage();
+        }else{
+            sendFlowDeleteMessage(z);
         }
     }
 
@@ -195,7 +193,9 @@ public class ClientSocket implements IFloodlightModule {
     }
 
     private void sendFlowDeleteMessage(double z) {
-
+        if(z == 0){
+            return;
+        }
         Map<DatapathId, List<OFStatsReply>> replies = getAllFlowStatistics(switchService.getAllSwitchDpids());
         int numberFlowDeleted = 0;
         int numberFlow = 0;
@@ -221,6 +221,7 @@ public class ClientSocket implements IFloodlightModule {
             }
         }
     }
+
     private static void sort(List<OFFlowStatsEntry> IP) {
         int n = IP.size();
         for (int i = n / 2 - 1; i >= 0; i--) {
