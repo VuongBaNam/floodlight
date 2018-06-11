@@ -18,12 +18,11 @@
 package net.floodlightcontroller.forwarding;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -49,6 +48,9 @@ import net.floodlightcontroller.routing.ForwardingBase;
 import net.floodlightcontroller.routing.IRoutingDecision;
 import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Route;
+import net.floodlightcontroller.statistics.IStatisticsService;
+import net.floodlightcontroller.statistics.SwitchPortBandwidth;
+import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.topology.ITopologyService;
 import net.floodlightcontroller.topology.NodePortTuple;
 import net.floodlightcontroller.util.FlowModUtils;
@@ -56,34 +58,22 @@ import net.floodlightcontroller.util.OFDPAUtils;
 import net.floodlightcontroller.util.OFPortMode;
 import net.floodlightcontroller.util.OFPortModeTuple;
 
-import org.projectfloodlight.openflow.protocol.OFFlowMod;
-import org.projectfloodlight.openflow.protocol.OFFlowModCommand;
-import org.projectfloodlight.openflow.protocol.OFGroupType;
-import org.projectfloodlight.openflow.protocol.OFPacketIn;
-import org.projectfloodlight.openflow.protocol.OFPacketOut;
-import org.projectfloodlight.openflow.protocol.OFPortDesc;
-import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
+import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.action.OFActions;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
-import org.projectfloodlight.openflow.types.DatapathId;
-import org.projectfloodlight.openflow.types.EthType;
-import org.projectfloodlight.openflow.types.IPv4Address;
-import org.projectfloodlight.openflow.types.IPv6Address;
-import org.projectfloodlight.openflow.types.IpProtocol;
-import org.projectfloodlight.openflow.types.MacAddress;
-import org.projectfloodlight.openflow.types.OFBufferId;
-import org.projectfloodlight.openflow.types.OFGroup;
-import org.projectfloodlight.openflow.types.OFPort;
-import org.projectfloodlight.openflow.types.OFVlanVidMatch;
-import org.projectfloodlight.openflow.types.TableId;
-import org.projectfloodlight.openflow.types.U64;
-import org.projectfloodlight.openflow.types.VlanVid;
+import org.projectfloodlight.openflow.types.*;
+import org.python.constantine.platform.IPProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener {
+public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener ,IStatisticsService {
 	protected static Logger log = LoggerFactory.getLogger(Forwarding.class);
+	protected static BlockingQueue<String> newFlow = new LinkedBlockingQueue<String>();
+	private static IThreadPoolService threadPoolService;
+	private static ScheduledFuture<?>  flowStatistic;
 
 	@Override
 	public Command processPacketInMessage(IOFSwitch sw, OFPacketIn pi, IRoutingDecision decision, FloodlightContext cntx) {
@@ -157,10 +147,19 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	}
 
 	protected void doForwardFlow(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, boolean requestFlowRemovedNotifn) {
+		System.out.println(pi);
 		OFPort inPort = (pi.getVersion().compareTo(OFVersion.OF_12) < 0 ? pi.getInPort() : pi.getMatch().get(MatchField.IN_PORT));
 		IDevice dstDevice = IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
 		DatapathId source = sw.getId();
-				
+
+		createFlowIn(sw,inPort,cntx);
+		String flow = getFlow(pi.getMatch());
+		try {
+			newFlow.put(System.currentTimeMillis() + flow);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
 		if (dstDevice != null) {
 			IDevice srcDevice = IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_SRC_DEVICE);
 
@@ -269,6 +268,48 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			log.debug("Destination unknown. Flooding packet");
 			doFlood(sw, pi, cntx);
 		}
+	}
+
+	private void createFlowIn(IOFSwitch sw,OFPort inPort,FloodlightContext cntx){
+		Match piMatch = createMatchFromPacket(sw, inPort, cntx);
+
+		if(piMatch.get(MatchField.IPV4_DST) != null) {
+			OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
+			Match match = sw.getOFFactory().buildMatch()
+					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+					.setExact(MatchField.IPV4_SRC, piMatch.get(MatchField.IPV4_DST))
+					.setExact(MatchField.UDP_SRC,TransportPort.of(53))
+					.build();
+			OFActions actions = sw.getOFFactory().actions();
+			List<OFAction> listActions = new ArrayList<OFAction>(); // set no action to drop
+			OFActionOutput output = actions.buildOutput()
+					.setMaxLen(0xFFffFFff)
+					.setPort(inPort)
+					.build();
+			listActions.add(output);
+			fmb.setMatch(match).setIdleTimeout(30).setPriority(1000).setActions(listActions);
+			sw.write(fmb.build());
+		}
+	}
+
+	private String getFlow(Match match){
+		IPv4Address ip_src = match.get(MatchField.IPV4_SRC);
+		TransportPort port_src = TransportPort.of(0);
+		TransportPort port_dst = TransportPort.of(0);
+		String protocol = "ICMP";
+		IpProtocol proto = match.get(MatchField.IP_PROTO);
+		if(proto.getIpProtocolNumber() == IpProtocol.TCP.getIpProtocolNumber()){
+			port_src = match.get(MatchField.TCP_SRC);
+			port_dst = match.get(MatchField.TCP_DST);
+			protocol = "TCP";
+		}else if(proto.getIpProtocolNumber() == IpProtocol.UDP.getIpProtocolNumber()){
+			port_src = match.get(MatchField.UDP_SRC);
+			port_dst = match.get(MatchField.UDP_DST);
+			protocol = "UDP";
+		}
+		String s = ip_src.toString() +"\t"+port_src.getPort()+"\t"+port_dst.getPort()+"\t"+protocol;
+
+		return s;
 	}
 
 	/**
@@ -424,15 +465,19 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
-		// We don't export any services
-		return null;
+		Collection<Class<? extends IFloodlightService>> l =
+				new ArrayList<Class<? extends IFloodlightService>>();
+		l.add(IStatisticsService.class);
+		return l;
 	}
 
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService>
 	getServiceImpls() {
-		// We don't have any services
-		return null;
+		Map<Class<? extends IFloodlightService>, IFloodlightService> m =
+				new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
+		m.put(IStatisticsService.class, this);
+		return m;
 	}
 
 	@Override
@@ -444,12 +489,14 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		l.add(IRoutingService.class);
 		l.add(ITopologyService.class);
 		l.add(IDebugCounterService.class);
+		l.add(IThreadPoolService.class);
 		return l;
 	}
 
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
 		super.init();
+		threadPoolService = context.getServiceImpl(IThreadPoolService.class);
 		this.floodlightProviderService = context.getServiceImpl(IFloodlightProviderService.class);
 		this.deviceManagerService = context.getServiceImpl(IDeviceService.class);
 		this.routingEngineService = context.getServiceImpl(IRoutingService.class);
@@ -572,5 +619,43 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 	@Override
 	public void switchChanged(DatapathId switchId) {
+	}
+
+	@Override
+	public SwitchPortBandwidth getBandwidthConsumption(DatapathId dpid, OFPort p) {
+		return null;
+	}
+
+	@Override
+	public Map<NodePortTuple, SwitchPortBandwidth> getBandwidthConsumption() {
+		return null;
+	}
+
+	@Override
+	public void collectStatistics(boolean collect) {
+		if(collect){
+			startStatisticsCollection();
+		}
+	}
+
+	class FlowStatistic implements Runnable{
+
+		@Override
+		public void run() {
+			String str = "";
+			try {
+				while ((str = newFlow.poll(100,TimeUnit.MILLISECONDS)) != null){
+
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private void startStatisticsCollection() {
+		//flowStatistic = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new FlowStatistic(), 5, 5, TimeUnit.SECONDS);
+		new Thread(new FlowStatistic()).start();
+		log.warn("Statistics new flow thread(s) started");
 	}
 }

@@ -4,7 +4,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import net.floodlightcontroller.OCSVM.DataPoint;
 import net.floodlightcontroller.OCSVM.OneclassSVM;
-import net.floodlightcontroller.accesscontrollist.ACLRule;
 import net.floodlightcontroller.accesscontrollist.IACLService;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
@@ -39,7 +38,6 @@ public class ClientSocket implements IFloodlightModule {
     private Socket socket;
     private Gson gson;
     private IOFSwitchService switchService;
-    private IACLService iaclService;
 
     @Override
     public Collection<Class<? extends IFloodlightService>> getModuleServices() {
@@ -65,7 +63,6 @@ public class ClientSocket implements IFloodlightModule {
         gson = new Gson();
         servSocket = new ServerSocket(DEFAULT_PORT);
         switchService = context.getServiceImpl(IOFSwitchService.class);
-        iaclService = context.getServiceImpl(IACLService.class);
         log.info("Start server Socket");
     }
 
@@ -83,25 +80,19 @@ public class ClientSocket implements IFloodlightModule {
     }
     private void communicate(Socket connSocket) {
         try {
-            ObjectInputStream in = new ObjectInputStream(connSocket.getInputStream());
-
+            BufferedReader in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
             byte[] data = new byte[1500];
             try {
-                while ((in.read(data)) != -1) {
+                while (true) {
 
                     // Xử lý dữ liệu đầu vào được gửi từ analyzer
-                    StringBuilder json = new StringBuilder();
-                    for(int i = 0;i < data.length;i++) {
-                        if(data[i] != 0){
-                            json.append(new Character((char)data[i]));
-                            if('}' == (char)data[i]){
-                                break;
-                            }
-                        }
-                    }
+                    String json = in.readLine();
                     System.out.println(json);
                     if (json.toString().contains("null")) continue;
                     DataModel dataModel = gson.fromJson(json.toString(),DataModel.class);
+
+                    //drop ip tấn công http get
+                    doDropIPAttack(dataModel.getList());
 
                     //Module OCSVM và giải pháp dropICMP
                     OCSVM(dataModel.getTOTAL_PKT(),dataModel.getPKT_SIZE_AVG());
@@ -117,6 +108,25 @@ public class ClientSocket implements IFloodlightModule {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void doDropIPAttack(List<String> ip){
+        for(DatapathId datapathId : switchService.getAllSwitchDpids()){
+            IOFSwitch sw = switchService.getSwitch(datapathId);
+            OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
+            for(String IP : ip){
+                Match match = sw.getOFFactory().buildMatch()
+                        .setExact(MatchField.ETH_TYPE,EthType.IPv4)
+                        .setExact(MatchField.IPV4_SRC,IPv4Address.of(IP))
+                        .build();
+                List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
+                fmb.setMatch(match).setIdleTimeout(30);//drop ip attack trong 30s
+
+                FlowModUtils.setActions(fmb, actions, sw);
+
+                sw.write(fmb.build());
+            }
         }
     }
 
@@ -153,6 +163,7 @@ public class ClientSocket implements IFloodlightModule {
             IOFSwitch sw = switchService.getSwitch(datapathId);
             OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
             Match match = sw.getOFFactory().buildMatch()
+                    .setExact(MatchField.ETH_TYPE,EthType.IPv4)
                     .setExact(MatchField.UDP_SRC,TransportPort.of(53))
                     .build();
             List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop

@@ -6,6 +6,12 @@ import java.net.ServerSocket;
 import java.util.Collection;
 import java.util.Map;
 
+import net.floodlightcontroller.core.FloodlightContext;
+import net.floodlightcontroller.core.IListener;
+import net.floodlightcontroller.core.IOFMessageListener;
+import net.floodlightcontroller.core.IOFSwitch;
+import org.projectfloodlight.openflow.protocol.OFMessage;
+import org.projectfloodlight.openflow.protocol.OFType;
 import org.simpleframework.transport.Socket;
 
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
@@ -13,7 +19,7 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 
-public class MacTracker implements IFloodlightModule{
+public class MacTracker implements IFloodlightModule,IOFMessageListener{
 	public static final int port = 9999;
 	ServerSocket servSocket;
 
@@ -71,4 +77,23 @@ public class MacTracker implements IFloodlightModule{
 		}	
 	}
 
+	@Override
+	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
+		return Command.CONTINUE;
+	}
+
+	@Override
+	public String getName() {
+		return null;
+	}
+
+	@Override
+	public boolean isCallbackOrderingPrereq(OFType type, String name) {
+		return false;
+	}
+
+	@Override
+	public boolean isCallbackOrderingPostreq(OFType type, String name) {
+		return false;
+	}
 }
