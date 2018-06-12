@@ -50,6 +50,8 @@ import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Route;
 import net.floodlightcontroller.statistics.IStatisticsService;
 import net.floodlightcontroller.statistics.SwitchPortBandwidth;
+import net.floodlightcontroller.test.Flow;
+import net.floodlightcontroller.test.Item;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.topology.ITopologyService;
 import net.floodlightcontroller.topology.NodePortTuple;
@@ -65,15 +67,12 @@ import org.projectfloodlight.openflow.protocol.action.OFActions;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.*;
-import org.python.constantine.platform.IPProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener ,IStatisticsService {
+public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener {
 	protected static Logger log = LoggerFactory.getLogger(Forwarding.class);
-	protected static BlockingQueue<String> newFlow = new LinkedBlockingQueue<String>();
-	private static IThreadPoolService threadPoolService;
-	private static ScheduledFuture<?>  flowStatistic;
+	public static final String IP_SERVER = "192.168.1.1";
 
 	@Override
 	public Command processPacketInMessage(IOFSwitch sw, OFPacketIn pi, IRoutingDecision decision, FloodlightContext cntx) {
@@ -147,17 +146,15 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	}
 
 	protected void doForwardFlow(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, boolean requestFlowRemovedNotifn) {
-		System.out.println(pi);
+//		System.out.println(pi);
 		OFPort inPort = (pi.getVersion().compareTo(OFVersion.OF_12) < 0 ? pi.getInPort() : pi.getMatch().get(MatchField.IN_PORT));
 		IDevice dstDevice = IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
 		DatapathId source = sw.getId();
 
-		createFlowIn(sw,inPort,cntx);
-		String flow = getFlow(pi.getMatch());
-		try {
-			newFlow.put(System.currentTimeMillis() + flow);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+
+		IPv4Address ip_src = pi.getMatch().get(MatchField.IPV4_SRC);
+		if(ip_src.toString().equals(IP_SERVER)) {
+			createFlowIn(sw, inPort, cntx);
 		}
 
 		if (dstDevice != null) {
@@ -290,26 +287,6 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			fmb.setMatch(match).setIdleTimeout(30).setPriority(1000).setActions(listActions);
 			sw.write(fmb.build());
 		}
-	}
-
-	private String getFlow(Match match){
-		IPv4Address ip_src = match.get(MatchField.IPV4_SRC);
-		TransportPort port_src = TransportPort.of(0);
-		TransportPort port_dst = TransportPort.of(0);
-		String protocol = "ICMP";
-		IpProtocol proto = match.get(MatchField.IP_PROTO);
-		if(proto.getIpProtocolNumber() == IpProtocol.TCP.getIpProtocolNumber()){
-			port_src = match.get(MatchField.TCP_SRC);
-			port_dst = match.get(MatchField.TCP_DST);
-			protocol = "TCP";
-		}else if(proto.getIpProtocolNumber() == IpProtocol.UDP.getIpProtocolNumber()){
-			port_src = match.get(MatchField.UDP_SRC);
-			port_dst = match.get(MatchField.UDP_DST);
-			protocol = "UDP";
-		}
-		String s = ip_src.toString() +"\t"+port_src.getPort()+"\t"+port_dst.getPort()+"\t"+protocol;
-
-		return s;
 	}
 
 	/**
@@ -465,19 +442,13 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
-		Collection<Class<? extends IFloodlightService>> l =
-				new ArrayList<Class<? extends IFloodlightService>>();
-		l.add(IStatisticsService.class);
-		return l;
+		return null;
 	}
 
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService>
 	getServiceImpls() {
-		Map<Class<? extends IFloodlightService>, IFloodlightService> m =
-				new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
-		m.put(IStatisticsService.class, this);
-		return m;
+		return null;
 	}
 
 	@Override
@@ -489,14 +460,12 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		l.add(IRoutingService.class);
 		l.add(ITopologyService.class);
 		l.add(IDebugCounterService.class);
-		l.add(IThreadPoolService.class);
 		return l;
 	}
 
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
 		super.init();
-		threadPoolService = context.getServiceImpl(IThreadPoolService.class);
 		this.floodlightProviderService = context.getServiceImpl(IFloodlightProviderService.class);
 		this.deviceManagerService = context.getServiceImpl(IDeviceService.class);
 		this.routingEngineService = context.getServiceImpl(IRoutingService.class);
@@ -621,41 +590,67 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 	public void switchChanged(DatapathId switchId) {
 	}
 
-	@Override
-	public SwitchPortBandwidth getBandwidthConsumption(DatapathId dpid, OFPort p) {
-		return null;
-	}
-
-	@Override
-	public Map<NodePortTuple, SwitchPortBandwidth> getBandwidthConsumption() {
-		return null;
-	}
-
-	@Override
-	public void collectStatistics(boolean collect) {
-		if(collect){
-			startStatisticsCollection();
-		}
-	}
-
-	class FlowStatistic implements Runnable{
-
-		@Override
-		public void run() {
-			String str = "";
-			try {
-				while ((str = newFlow.poll(100,TimeUnit.MILLISECONDS)) != null){
-
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-
-	private void startStatisticsCollection() {
-		//flowStatistic = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new FlowStatistic(), 5, 5, TimeUnit.SECONDS);
-		new Thread(new FlowStatistic()).start();
-		log.warn("Statistics new flow thread(s) started");
-	}
+//	class FlowStatistic implements Runnable{
+//
+//		protected List<Item> listFlow1;
+//
+//		public FlowStatistic(){
+//			listFlow1 = new ArrayList<>();
+//		}
+//
+//		public boolean flowCompare(Item i,Item item) {
+//			if (i.getFieldValue(Flow.IP_SRC.toString()).equals(item.getFieldValue(Flow.IP_SRC.toString()))
+//					&& i.getFieldValue(Flow.PORT_SRC.toString()).equals(item.getFieldValue(Flow.PORT_SRC.toString()))
+//					&& i.getFieldValue(Flow.PORT_DST.toString()).equals(item.getFieldValue(Flow.PORT_DST.toString())))
+//				return true;
+//
+//			return false;
+//		}
+//
+//		public Item getItem(Item item,List<Item> listFlow){
+//			for(Item i : listFlow){
+//				if(flowCompare(i,item)){
+//					return i;
+//				}
+//			}
+//			return null;
+//		}
+//
+//		public Item createItem(String line){
+//
+//			Item item = new Item();
+//			String a[] = line.split("\t");
+//			item.setAttribute(Flow.IP_SRC.toString(),a[0]);
+//			item.setAttribute(Flow.PORT_SRC.toString(), a[1]);
+//			item.setAttribute(Flow.PORT_DST.toString(), a[2]);
+//			item.setAttribute(Flow.PROTOCOL.toString(),a[3]);
+//			item.setAttribute(Flow.COUNT.toString(),Long.valueOf(1));
+//			return item;
+//		}
+//
+//		@Override
+//		public void run() {
+//			String str = "";
+//			try {
+//				while (true){
+//					str = newFlow.poll(100,TimeUnit.MILLISECONDS);
+//					if (str == null) continue;
+//					Item item = createItem(str);
+//					if(str.equals("end")){
+//
+//					}else {
+//						Item first = getItem(item,listFlow1);
+//
+//						if (first == null) {//first = null => gói tin vừa nhận được là gói tin đầu tiên của luồng
+//							listFlow1.add(item);
+//						} else {
+//							first.setAttribute(Flow.COUNT.toString(), (Long) first.getFieldValue(Flow.COUNT.toString()) + 1);
+//						}
+//					}
+//				}
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//	}
 }
