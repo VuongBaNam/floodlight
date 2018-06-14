@@ -1,5 +1,6 @@
 package net.floodlightcontroller.udp_detection;
 
+import Jama.Matrix;
 import com.google.common.util.concurrent.ListenableFuture;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
@@ -7,9 +8,7 @@ import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
-import net.floodlightcontroller.test.Item;
 import net.floodlightcontroller.test.Parameter;
-import net.floodlightcontroller.threadpool.IThreadPoolService;
 import org.projectfloodlight.openflow.protocol.OFFlowStatsEntry;
 import org.projectfloodlight.openflow.protocol.OFFlowStatsReply;
 import org.projectfloodlight.openflow.protocol.OFStatsReply;
@@ -77,8 +76,21 @@ public class DetectionUDP implements IFloodlightModule {
                 }
                 Parameter parameter = getParameter(listNewFlow);
 
-                //chạy thuật toán
 
+                double[] input = {parameter.getENTROPY_IP_SRC(), parameter.getENTROPY_PORT_SRC(), parameter.getENTROPY_PORT_DST(), parameter.getENTROPY_PROTOCOL(),parameter.getTotal_pkt()};
+                System.out.println("hung hung hung" + input[0]);
+
+                //chạy thuật toán
+                input = normalization(input);
+                KNN knnAlgorithm = new KNN(3);
+                Matrix udp_dataset = knnAlgorithm.readFile("E:\\hoc tap\\floodlight\\udp_dataset.csv");
+                int result = knnAlgorithm.Calculate(udp_dataset, input);
+                if(result == 1) {
+                    System.out.println("Attack");
+                    System.out.println("Attack");
+                    System.out.println("Attack");
+                    System.out.println("Attack");
+                }
 
                 listFlow1.clear();
                 listFlow1.putAll(listFlow2);
@@ -93,8 +105,11 @@ public class DetectionUDP implements IFloodlightModule {
         Map<Integer,Long> port_src = new HashMap<>();
         Map<Integer,Long> port_dst = new HashMap<>();
         Map<String,Long> protocol = new HashMap<>();
+        long total = 0;
         for(OFFlowStatsEntry entry : listNewFlow){
             Match match = entry.getMatch();
+
+            total += entry.getPacketCount().getValue();
             IPv4Address ip_s = match.get(MatchField.IPV4_SRC);
             TransportPort port_s = TransportPort.of(0);
             TransportPort port_d = TransportPort.of(0);
@@ -126,7 +141,7 @@ public class DetectionUDP implements IFloodlightModule {
                 protocol.put(pro,number_pkt);
             }else protocol.put(pro,protocol.get(pro)+number_pkt);
         }
-        Parameter parameter = new Parameter(entropy(ip_src),entropy(port_src),entropy(port_dst),entropy(protocol));
+        Parameter parameter = new Parameter(entropy(ip_src),entropy(port_src),entropy(port_dst),entropy(protocol),total);
         return parameter;
     }
 
@@ -173,5 +188,14 @@ public class DetectionUDP implements IFloodlightModule {
             return new ArrayList<OFStatsReply>();
         }
         return values;
+    }
+    private double[] normalization(double[] features){
+        // 5 feature: entropy of IP source, port source, port des, packet type, total packet
+        double[] maxFeature = {12.688703, 12.433445, 0.117221, 0.133031, 13218.000000};
+        double[] minFeature = {6.606806, 7.539159, 0.000000, 0.000000, 186.000000};
+        for(int i = 0; i < features.length; i++){
+            features[i] = (features[i] - maxFeature[i])/(maxFeature[i] - minFeature[i]);
+        }
+        return features;
     }
 }

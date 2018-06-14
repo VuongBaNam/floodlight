@@ -8,12 +8,22 @@ public class Parameter {
     double ENTROPY_PORT_SRC;
     double ENTROPY_PORT_DST;
     double ENTROPY_PROTOCOL;
+    long total_pkt;
 
-    public Parameter(double ENTROPY_IP_SRC, double ENTROPY_PORT_SRC, double ENTROPY_PORT_DST, double ENTROPY_PROTOCOL) {
+    public Parameter(double ENTROPY_IP_SRC, double ENTROPY_PORT_SRC, double ENTROPY_PORT_DST, double ENTROPY_PROTOCOL,long total_pkt) {
         this.ENTROPY_IP_SRC = ENTROPY_IP_SRC;
         this.ENTROPY_PORT_SRC = ENTROPY_PORT_SRC;
         this.ENTROPY_PORT_DST = ENTROPY_PORT_DST;
         this.ENTROPY_PROTOCOL = ENTROPY_PROTOCOL;
+        this.total_pkt = total_pkt;
+    }
+
+    public long getTotal_pkt() {
+        return total_pkt;
+    }
+
+    public void setTotal_pkt(long total_pkt) {
+        this.total_pkt = total_pkt;
     }
 
     public double getENTROPY_IP_SRC() {

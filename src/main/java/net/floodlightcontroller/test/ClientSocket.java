@@ -87,21 +87,21 @@ public class ClientSocket implements IFloodlightModule {
 
                     // Xử lý dữ liệu đầu vào được gửi từ analyzer
                     String json = in.readLine();
-                    System.out.println(json);
+//                    System.out.println(json);
                     if (json.toString().contains("null")) continue;
                     DataModel dataModel = gson.fromJson(json.toString(),DataModel.class);
 
                     //drop ip tấn công http get
                     doDropIPAttack(dataModel.getList());
-
-                    //Module OCSVM và giải pháp dropICMP
-                    OCSVM(dataModel.getTOTAL_PKT(),dataModel.getPKT_SIZE_AVG());
-
-                    //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
-                    Fuzzy(dataModel.getPPF(),dataModel.getP_IAT());
-
-                    //Module DNS và giải pháp chặn bản tin DNS response
-                    DNS(dataModel.getRATE_DNSRESPONE(),dataModel.getTOTAL_DNSRESPONE());
+//
+//                    //Module OCSVM và giải pháp dropICMP
+//                    OCSVM(dataModel.getTOTAL_PKT(),dataModel.getPKT_SIZE_AVG());
+//
+//                    //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
+//                    Fuzzy(dataModel.getPPF(),dataModel.getP_IAT());
+//
+//                    //Module DNS và giải pháp chặn bản tin DNS response
+//                    DNS(dataModel.getRATE_DNSRESPONE(),dataModel.getTOTAL_DNSRESPONE());
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
@@ -145,6 +145,7 @@ public class ClientSocket implements IFloodlightModule {
             log.info("Normal");
         }else {
             doDropFlowICMP();
+            sendFlowDeleteMessage();
             log.info("Abnormal");
         }
     }
@@ -215,8 +216,8 @@ public class ClientSocket implements IFloodlightModule {
                 OFFlowStatsReply fsr = (OFFlowStatsReply) r;
                 List<OFFlowStatsEntry> list = fsr.getEntries();
                 sort(list);
-                numberFlow = list.size();
                 for (OFFlowStatsEntry fse : list) {
+                    numberFlow++;
                     Match match = fse.getMatch();
 
                     if(numberFlowDeleted*1.0/numberFlow < z){
@@ -231,6 +232,38 @@ public class ClientSocket implements IFloodlightModule {
                 }
             }
         }
+        System.out.println("==========================");
+        System.out.println(numberFlowDeleted+" "+numberFlow);
+    }
+
+    private void sendFlowDeleteMessage() {
+        Map<DatapathId, List<OFStatsReply>> replies = getAllFlowStatistics(switchService.getAllSwitchDpids());
+        int numberFlowDeleted = 0;
+        int numberFlow = 0;
+        for (Map.Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
+            for (OFStatsReply r : e.getValue()) {
+                OFFlowStatsReply fsr = (OFFlowStatsReply) r;
+                List<OFFlowStatsEntry> list = fsr.getEntries();
+                sort(list);
+                for (OFFlowStatsEntry fse : list) {
+                    numberFlow++;
+                    Match match = fse.getMatch();
+
+                    if(fse.getPacketCount().getValue() == 1){
+                        numberFlowDeleted++;
+                        IOFSwitch sw = switchService.getSwitch(e.getKey());
+
+                        OFFlowDelete flowDelete = sw.getOFFactory().buildFlowDelete()
+                                .setOutPort(OFPort.ANY)
+                                .setMatch(match).build();
+                        sw.write(flowDelete);
+                        numberFlowDeleted++;
+                    }
+                }
+            }
+        }
+        System.out.println("==========================");
+        System.out.println(numberFlowDeleted+" "+numberFlow);
     }
 
     private static void sort(List<OFFlowStatsEntry> IP) {
