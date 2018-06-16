@@ -86,7 +86,6 @@ public class ClientSocket implements IFloodlightModule {
             BufferedReader in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
             try {
                 while (true) {
-
                     // Xử lý dữ liệu đầu vào được gửi từ analyzer
                     String json = in.readLine();
 //                    System.out.println(json);
