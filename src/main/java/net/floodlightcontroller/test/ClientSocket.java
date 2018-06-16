@@ -70,6 +70,7 @@ public class ClientSocket implements IFloodlightModule {
 
     @Override
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
+        System.out.println("aaa");
         while (true){
             try{
                 socket = servSocket.accept();
@@ -83,19 +84,23 @@ public class ClientSocket implements IFloodlightModule {
     private void communicate(Socket connSocket) {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(connSocket.getInputStream()));
-            byte[] data = new byte[1500];
             try {
                 while (true) {
 
                     // Xử lý dữ liệu đầu vào được gửi từ analyzer
                     String json = in.readLine();
 //                    System.out.println(json);
-                    if (json.toString().contains("null")) continue;
+                    if (json == null) continue;
+                    if (json.contains("null")) continue;
                     String a[] = json.split("@");
-                    if(a[0].equals("5s")){
+                    if(a[0].equals("5S")){
                         Data dataModel = gson.fromJson(a[1], Data.class);
                         double[] input = {dataModel.getENTROPY_IP_SRC(), dataModel.getENTROPY_PORT_SRC(), dataModel.getENTROPY_PORT_DST(), dataModel.getENTROPY_PROTOCOL(),dataModel.getTotal_pkt()};
 
+                        for(int i = 0;i < input.length;i++){
+                            System.out.print(input[i] +" ");
+                        }
+                        System.out.println();
                         //chạy thuật toán
                         input = normalization(input);
                         for(int i = 0;i < input.length;i++){
@@ -114,7 +119,7 @@ public class ClientSocket implements IFloodlightModule {
                         DataModel dataModel = gson.fromJson(a[1], DataModel.class);
 
                         //drop ip tấn công http get
-                        doDropIPAttack(dataModel.getList());
+//                        doDropIPAttack(dataModel.getList());
 
                         //Module OCSVM và giải pháp dropICMP
 //                        OCSVM(dataModel.getTOTAL_PKT(), dataModel.getPKT_SIZE_AVG());
@@ -380,7 +385,7 @@ public class ClientSocket implements IFloodlightModule {
         double[] maxFeature = {12.688703, 12.433445, 0.117221, 0.133031, 13218.000000};
         double[] minFeature = {6.606806, 7.539159, 0.000000, 0.000000, 186.000000};
         for(int i = 0; i < features.length; i++){
-            features[i] = (features[i] - maxFeature[i])/(maxFeature[i] - minFeature[i]);
+            features[i] = (features[i] - minFeature[i])/(maxFeature[i] - minFeature[i]);
         }
         return features;
     }
