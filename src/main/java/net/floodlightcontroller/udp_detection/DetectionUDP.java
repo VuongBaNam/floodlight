@@ -2,17 +2,17 @@ package net.floodlightcontroller.udp_detection;
 
 import Jama.Matrix;
 import com.google.common.util.concurrent.ListenableFuture;
+import net.floodlightcontroller.core.FloodlightContext;
+import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.packet.*;
 import net.floodlightcontroller.test.Parameter;
-import org.projectfloodlight.openflow.protocol.OFFlowStatsEntry;
-import org.projectfloodlight.openflow.protocol.OFFlowStatsReply;
-import org.projectfloodlight.openflow.protocol.OFStatsReply;
-import org.projectfloodlight.openflow.protocol.OFStatsRequest;
+import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.*;
@@ -22,6 +22,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class DetectionUDP implements IFloodlightModule {
+    private FloodlightModuleContext context;
     private IOFSwitchService switchService;
     private static long start = 0;
     private static Map<OFFlowStatsEntry,Integer> listFlow1;
@@ -47,56 +48,79 @@ public class DetectionUDP implements IFloodlightModule {
     @Override
     public void init(FloodlightModuleContext context) throws FloodlightModuleException, IOException {
         switchService = context.getServiceImpl(IOFSwitchService.class);
+        this.context = context;
         start = System.currentTimeMillis();
         listFlow1 = new HashMap<>();
         listFlow2 = new HashMap<>();
+        System.out.println("Start Detection UDP");
     }
 
     @Override
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
+        System.out.println("aaa");
         while (true){
-            long end = System.currentTimeMillis();
-            if(end - start < 5000){
-                Map<DatapathId, List<OFStatsReply>> replies = getAllFlowStatistics(switchService.getAllSwitchDpids());
-                for (Map.Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
-                    for (OFStatsReply r : e.getValue()) {
-                        OFFlowStatsReply fsr = (OFFlowStatsReply) r;
-                        List<OFFlowStatsEntry> list = fsr.getEntries();
-                        for (OFFlowStatsEntry fse : list) {
-                            listFlow2.put(fse,1);
-                        }
+            runAlgol();
+        }
+    }
+
+    private void runAlgol(){
+        long end = System.currentTimeMillis();
+        if(end - start < 5000){
+            Map<DatapathId, List<OFStatsReply>> replies = getAllFlowStatistics(switchService.getAllSwitchDpids());
+//            System.out.println(replies);
+            for (Map.Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
+                for (OFStatsReply r : e.getValue()) {
+                    OFFlowStatsReply fsr = (OFFlowStatsReply) r;
+                    List<OFFlowStatsEntry> list = fsr.getEntries();
+                    for (OFFlowStatsEntry fse : list) {
+                        listFlow2.put(fse,1);
                     }
                 }
-            }else {
-                List<OFFlowStatsEntry> listNewFlow = new ArrayList<>();
-                for (Map.Entry<OFFlowStatsEntry, Integer> e : listFlow2.entrySet()) {
-                    if(listFlow1.get(e.getKey()) == null){
-                        listNewFlow.add(e.getKey());
-                    }
-                }
-                Parameter parameter = getParameter(listNewFlow);
-
-
-                double[] input = {parameter.getENTROPY_IP_SRC(), parameter.getENTROPY_PORT_SRC(), parameter.getENTROPY_PORT_DST(), parameter.getENTROPY_PROTOCOL(),parameter.getTotal_pkt()};
-                System.out.println("hung hung hung" + input[0]);
-
-                //chạy thuật toán
-                input = normalization(input);
-                KNN knnAlgorithm = new KNN(3);
-                Matrix udp_dataset = knnAlgorithm.readFile("E:\\hoc tap\\floodlight\\udp_dataset.csv");
-                int result = knnAlgorithm.Calculate(udp_dataset, input);
-                if(result == 1) {
-                    System.out.println("Attack");
-                    System.out.println("Attack");
-                    System.out.println("Attack");
-                    System.out.println("Attack");
-                }
-
-                listFlow1.clear();
-                listFlow1.putAll(listFlow2);
-                listFlow2.clear();
-                start = end;
             }
+        }else {
+            List<OFFlowStatsEntry> listNewFlow = new ArrayList<>();
+            for (Map.Entry<OFFlowStatsEntry, Integer> e : listFlow2.entrySet()) {
+                if(listFlow1.get(e.getKey()) == null){
+                    listNewFlow.add(e.getKey());
+                }
+            }
+            Parameter parameter = getParameter(listNewFlow);
+            if(parameter == null){
+                parameter = new Parameter(6.606806, 7.539159, 0.000000, 0.000000, 186);
+            }
+            System.out.println(parameter.getENTROPY_IP_SRC());
+            System.out.println(parameter.getENTROPY_PORT_DST());
+            System.out.println(parameter.getENTROPY_PORT_SRC());
+            System.out.println(parameter.getENTROPY_PROTOCOL());
+            System.out.println(parameter.getTotal_pkt());
+
+            double[] input = {parameter.getENTROPY_IP_SRC(), parameter.getENTROPY_PORT_SRC(), parameter.getENTROPY_PORT_DST(), parameter.getENTROPY_PROTOCOL(),parameter.getTotal_pkt()};
+
+            //chạy thuật toán
+            input = normalization(input);
+            for(int i = 0;i < input.length;i++){
+                System.out.print(input[i] +" ");
+            }
+            System.out.println();
+            KNN knnAlgorithm = new KNN(3);
+            Matrix udp_dataset = knnAlgorithm.readFile("E:\\hoc tap\\floodlight\\udp_dataset.csv");
+            int result = knnAlgorithm.Calculate(udp_dataset, input);
+            if(result == 1) {
+                System.out.println("Attack");
+                System.out.println("Attack");
+                System.out.println("Attack");
+                System.out.println("Attack");
+            }else {
+                System.out.println("Normal");
+                System.out.println("Normal");
+                System.out.println("Normal");
+                System.out.println("Normal");
+            }
+
+            listFlow1.clear();
+            listFlow1.putAll(listFlow2);
+            listFlow2.clear();
+            start = end;
         }
     }
 
@@ -106,7 +130,7 @@ public class DetectionUDP implements IFloodlightModule {
         Map<Integer,Long> port_dst = new HashMap<>();
         Map<String,Long> protocol = new HashMap<>();
         long total = 0;
-        for(OFFlowStatsEntry entry : listNewFlow){
+        for(OFFlowStatsEntry entry : listNewFlow) {
             Match match = entry.getMatch();
 
             total += entry.getPacketCount().getValue();
@@ -115,31 +139,33 @@ public class DetectionUDP implements IFloodlightModule {
             TransportPort port_d = TransportPort.of(0);
             String pro = "ICMP";
             IpProtocol proto = match.get(MatchField.IP_PROTO);
-            if(proto.getIpProtocolNumber() == IpProtocol.TCP.getIpProtocolNumber()){
-                port_s = match.get(MatchField.TCP_SRC);
-                port_d = match.get(MatchField.TCP_DST);
-                pro = "TCP";
-            }else if(proto.getIpProtocolNumber() == IpProtocol.UDP.getIpProtocolNumber()){
-                port_s = match.get(MatchField.UDP_SRC);
-                port_d = match.get(MatchField.UDP_DST);
-                pro = "UDP";
+            if(proto != null){
+                if(proto.getIpProtocolNumber() == IpProtocol.TCP.getIpProtocolNumber()){
+                    port_s = match.get(MatchField.TCP_SRC);
+                    port_d = match.get(MatchField.TCP_DST);
+                    pro = "TCP";
+                }else if(proto.getIpProtocolNumber() == IpProtocol.UDP.getIpProtocolNumber()){
+                    port_s = match.get(MatchField.UDP_SRC);
+                    port_d = match.get(MatchField.UDP_DST);
+                    pro = "UDP";
+                }
+                long number_pkt = entry.getPacketCount().getValue();
+                if(ip_src.get(ip_s.toString()) == null){
+                    ip_src.put(ip_s.toString(),number_pkt);
+                }else ip_src.put(ip_s.toString(),ip_src.get(ip_s.toString())+number_pkt);
+
+                if(port_src.get(port_s.getPort()) == null){
+                    port_src.put(port_s.getPort(),number_pkt);
+                }else port_src.put(port_s.getPort(),port_src.get(port_s.getPort())+number_pkt);
+
+                if(port_dst.get(port_d.getPort()) == null){
+                    port_dst.put(port_d.getPort(),number_pkt);
+                }else port_dst.put(port_d.getPort(),port_dst.get(port_d.getPort())+number_pkt);
+
+                if(protocol.get(pro) == null){
+                    protocol.put(pro,number_pkt);
+                }else protocol.put(pro,protocol.get(pro)+number_pkt);
             }
-            long number_pkt = entry.getPacketCount().getValue();
-            if(ip_src.get(ip_s.toString()) == null){
-                ip_src.put(ip_s.toString(),number_pkt);
-            }else ip_src.put(ip_s.toString(),ip_src.get(ip_s.toString())+number_pkt);
-
-            if(port_src.get(port_s.getPort()) == null){
-                port_src.put(port_s.getPort(),number_pkt);
-            }else port_src.put(port_s.getPort(),port_src.get(port_s.getPort())+number_pkt);
-
-            if(port_dst.get(port_d.getPort()) == null){
-                port_dst.put(port_d.getPort(),number_pkt);
-            }else port_dst.put(port_d.getPort(),port_dst.get(port_d.getPort())+number_pkt);
-
-            if(protocol.get(pro) == null){
-                protocol.put(pro,number_pkt);
-            }else protocol.put(pro,protocol.get(pro)+number_pkt);
         }
         Parameter parameter = new Parameter(entropy(ip_src),entropy(port_src),entropy(port_dst),entropy(protocol),total);
         return parameter;
@@ -149,14 +175,14 @@ public class DetectionUDP implements IFloodlightModule {
         long sum = 0;
         double entro = 0;
         for(Map.Entry<? extends Object,Long> entry : map.entrySet()){
-            sum += entry.getValue();
+            sum += entry.getValue()+1;
         }
         for(Map.Entry<? extends Object,Long> entry : map.entrySet()){
             double p = entry.getValue()*1.0/sum;
 
-            entro += p*Math.log(p)/Math.log(2);
+            entro += -p*Math.log(p)/Math.log(2);
         }
-        return Math.abs(entro);
+        return entro;
     }
 
     private Map<DatapathId, List<OFStatsReply>> getAllFlowStatistics(Set<DatapathId> dpids ){
@@ -198,4 +224,5 @@ public class DetectionUDP implements IFloodlightModule {
         }
         return features;
     }
+
 }

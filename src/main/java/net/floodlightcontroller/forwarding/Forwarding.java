@@ -151,10 +151,12 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		IDevice dstDevice = IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
 		DatapathId source = sw.getId();
 
-
-		IPv4Address ip_src = pi.getMatch().get(MatchField.IPV4_SRC);
-		if(ip_src.toString().equals(IP_SERVER)) {
-			createFlowIn(sw, inPort, cntx);
+		Match m = createMatchFromPacket(sw, inPort, cntx);
+		IPv4Address ip_src = m.get(MatchField.IPV4_SRC);
+		if(ip_src != null){
+			if(ip_src.toString().equals(IP_SERVER)) {
+				createFlowIn(sw, inPort, cntx);
+			}
 		}
 
 		if (dstDevice != null) {
@@ -232,7 +234,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 					dstDap.getSwitchDPID(),
 					dstDap.getPort(), U64.of(0)); //cookie = 0, i.e., default route
 
-			Match m = createMatchFromPacket(sw, inPort, cntx);
+
 			U64 cookie = AppCookie.makeCookie(FORWARDING_APP_ID, 0);
 			
 			if (route != null) {

@@ -3,43 +3,62 @@ package net.floodlightcontroller.test;
 import com.google.gson.annotations.SerializedName;
 
 public class Data {
-    @SerializedName("MaxRateProtol")
-    protected String maxRateProtol;
-    @SerializedName("PpF")
-    protected double PPF;
-    @SerializedName("IAT")
-    protected double P_IAT;
+    @SerializedName("ENTROPY_IP_SRC")
+    double ENTROPY_IP_SRC;
+    @SerializedName("ENTROPY_PORT_SRC")
+    double ENTROPY_PORT_SRC;
+    @SerializedName("ENTROPY_PORT_DST")
+    double ENTROPY_PORT_DST;
+    @SerializedName("ENTROPY_PROTOCOL")
+    double ENTROPY_PROTOCOL;
+    @SerializedName("total_pkt")
+    long total_pkt;
 
-    public Data() {
+    public Data(double ENTROPY_IP_SRC, double ENTROPY_PORT_SRC, double ENTROPY_PORT_DST, double ENTROPY_PROTOCOL,long total_pkt) {
+        this.ENTROPY_IP_SRC = ENTROPY_IP_SRC;
+        this.ENTROPY_PORT_SRC = ENTROPY_PORT_SRC;
+        this.ENTROPY_PORT_DST = ENTROPY_PORT_DST;
+        this.ENTROPY_PROTOCOL = ENTROPY_PROTOCOL;
+        this.total_pkt = total_pkt;
     }
 
-    public Data(String maxRateProtol, double PPF, double p_IAT) {
-        this.maxRateProtol = maxRateProtol;
-        this.PPF = PPF;
-        P_IAT = p_IAT;
+    public long getTotal_pkt() {
+        return total_pkt;
     }
 
-    public String getMaxRateProtol() {
-        return maxRateProtol;
+    public void setTotal_pkt(long total_pkt) {
+        this.total_pkt = total_pkt;
     }
 
-    public void setMaxRateProtol(String maxRateProtol) {
-        this.maxRateProtol = maxRateProtol;
+    public double getENTROPY_IP_SRC() {
+        return ENTROPY_IP_SRC;
     }
 
-    public double getPPF() {
-        return PPF;
+    public void setENTROPY_IP_SRC(double ENTROPY_IP_SRC) {
+        this.ENTROPY_IP_SRC = ENTROPY_IP_SRC;
     }
 
-    public void setPPF(double PPF) {
-        this.PPF = PPF;
+    public double getENTROPY_PORT_SRC() {
+        return ENTROPY_PORT_SRC;
     }
 
-    public double getP_IAT() {
-        return P_IAT;
+    public void setENTROPY_PORT_SRC(double ENTROPY_PORT_SRC) {
+        this.ENTROPY_PORT_SRC = ENTROPY_PORT_SRC;
     }
 
-    public void setP_IAT(double p_IAT) {
-        P_IAT = p_IAT;
+    public double getENTROPY_PORT_DST() {
+        return ENTROPY_PORT_DST;
+    }
+
+    public void setENTROPY_PORT_DST(double ENTROPY_PORT_DST) {
+        this.ENTROPY_PORT_DST = ENTROPY_PORT_DST;
+    }
+
+    public double getENTROPY_PROTOCOL() {
+        return ENTROPY_PROTOCOL;
+    }
+
+    public void setENTROPY_PROTOCOL(double ENTROPY_PROTOCOL) {
+        this.ENTROPY_PROTOCOL = ENTROPY_PROTOCOL;
     }
 }

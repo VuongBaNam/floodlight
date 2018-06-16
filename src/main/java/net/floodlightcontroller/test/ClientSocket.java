@@ -1,5 +1,6 @@
 package net.floodlightcontroller.test;
 
+import Jama.Matrix;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import net.floodlightcontroller.OCSVM.DataPoint;
@@ -14,6 +15,7 @@ import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.forwarding.Forwarding;
 import net.floodlightcontroller.fuzzy.Fuzzy;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
+import net.floodlightcontroller.udp_detection.KNN;
 import net.floodlightcontroller.util.FlowModUtils;
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
@@ -89,19 +91,40 @@ public class ClientSocket implements IFloodlightModule {
                     String json = in.readLine();
 //                    System.out.println(json);
                     if (json.toString().contains("null")) continue;
-                    DataModel dataModel = gson.fromJson(json.toString(),DataModel.class);
+                    String a[] = json.split("@");
+                    if(a[0].equals("5s")){
+                        Data dataModel = gson.fromJson(a[1], Data.class);
+                        double[] input = {dataModel.getENTROPY_IP_SRC(), dataModel.getENTROPY_PORT_SRC(), dataModel.getENTROPY_PORT_DST(), dataModel.getENTROPY_PROTOCOL(),dataModel.getTotal_pkt()};
 
-                    //drop ip tấn công http get
-                    doDropIPAttack(dataModel.getList());
+                        //chạy thuật toán
+                        input = normalization(input);
+                        for(int i = 0;i < input.length;i++){
+                            System.out.print(input[i] +" ");
+                        }
+                        System.out.println();
+                        KNN knnAlgorithm = new KNN(3);
+                        Matrix udp_dataset = knnAlgorithm.readFile("E:\\hoc tap\\floodlight\\udp_dataset.csv");
+                        int result = knnAlgorithm.Calculate(udp_dataset, input);
+                        if(result == 1) {
+                            System.out.println("Attack");
+                        }else {
+                            System.out.println("Normal");
+                        }
+                    }else {
+                        DataModel dataModel = gson.fromJson(a[1], DataModel.class);
+
+                        //drop ip tấn công http get
+                        doDropIPAttack(dataModel.getList());
+
+                        //Module OCSVM và giải pháp dropICMP
+//                        OCSVM(dataModel.getTOTAL_PKT(), dataModel.getPKT_SIZE_AVG());
 //
-//                    //Module OCSVM và giải pháp dropICMP
-//                    OCSVM(dataModel.getTOTAL_PKT(),dataModel.getPKT_SIZE_AVG());
+//                        //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
+//                        Fuzzy(dataModel.getPPF(), dataModel.getP_IAT());
 //
-//                    //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
-//                    Fuzzy(dataModel.getPPF(),dataModel.getP_IAT());
-//
-//                    //Module DNS và giải pháp chặn bản tin DNS response
-//                    DNS(dataModel.getRATE_DNSRESPONE(),dataModel.getTOTAL_DNSRESPONE());
+//                        //Module DNS và giải pháp chặn bản tin DNS response
+//                        DNS(dataModel.getRATE_DNSRESPONE(), dataModel.getTOTAL_DNSRESPONE());
+                    }
                 }
             } catch (IOException e) {
                 log.info("Cannot communicate to client!");
@@ -350,5 +373,15 @@ public class ClientSocket implements IFloodlightModule {
             return new ArrayList<OFStatsReply>();
         }
         return values;
+    }
+
+    private double[] normalization(double[] features){
+        // 5 feature: entropy of IP source, port source, port des, packet type, total packet
+        double[] maxFeature = {12.688703, 12.433445, 0.117221, 0.133031, 13218.000000};
+        double[] minFeature = {6.606806, 7.539159, 0.000000, 0.000000, 186.000000};
+        for(int i = 0; i < features.length; i++){
+            features[i] = (features[i] - maxFeature[i])/(maxFeature[i] - minFeature[i]);
+        }
+        return features;
     }
 }

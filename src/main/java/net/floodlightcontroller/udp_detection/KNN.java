@@ -14,10 +14,10 @@ import java.util.stream.IntStream;
 public class KNN {
 
     int k;
-    KNN(int k) {
+    public KNN(int k) {
         this.k = k;
     }
-    Matrix readFile(String filename){
+    public static Matrix readFile(String filename){
         String thisLine;
         List<String[]> lines = new ArrayList<>();
         List<double[]> line = new ArrayList<>();
@@ -45,7 +45,7 @@ public class KNN {
         Matrix udp_dataset = new Matrix(udp_data);
         return udp_dataset;
     }
-    int Calculate(Matrix matrix, double[] inputData){
+    public int Calculate(Matrix matrix, double[] inputData){
         int vote = 0;
         int[] row = IntStream.range(0, matrix.getRowDimension()).toArray();
         int[] col1 = {5};
@@ -78,7 +78,7 @@ public class KNN {
             double value = dataToSort[0][i];
             for(int j = 0; j < sum.getRowDimension(); j++){
                 if(sum.get(j,0) == value){
-                    System.out.println(j);
+//                    System.out.println(j);
                     if(udpLabel.get(j, 0) == 1)
                         vote += 1;
                 }
@@ -175,7 +175,7 @@ public class KNN {
     }
 //    public static void main(String[] args) {
 ////        System.out.println(Arrays.deepToString(c.getArray()));
-//        double[] input = {0.7001357702, 0.6649833848, 0, 0, 0.2719459791};
+//        double[] input = {0.7001357702,0.6649833848, 0, 0, 0.2719459791};
 //        Matrix udp_dataset = readFile("udp_dataset.csv");
 //        KNN test1 = new KNN(3);
 //        int result = test1.Calculate(udp_dataset, input);
