@@ -89,39 +89,20 @@ public class ClientSocket implements IFloodlightModule {
                     // Xử lý dữ liệu đầu vào được gửi từ analyzer
                     String json = in.readLine();
 //                    System.out.println(json);
-                    if (json == null) continue;
+                    if (json == null) break;
                     if (json.contains("null")) continue;
                     String a[] = json.split("@");
                     if(a[0].equals("5S")){
                         Data dataModel = gson.fromJson(a[1], Data.class);
-                        double[] input = {dataModel.getENTROPY_IP_SRC(), dataModel.getENTROPY_PORT_SRC(), dataModel.getENTROPY_PORT_DST(), dataModel.getENTROPY_PROTOCOL(),dataModel.getTotal_pkt()};
-
-                        for(int i = 0;i < input.length;i++){
-                            System.out.print(input[i] +" ");
-                        }
-                        System.out.println();
-                        //chạy thuật toán
-                        input = normalization(input);
-                        for(int i = 0;i < input.length;i++){
-                            System.out.print(input[i] +" ");
-                        }
-                        System.out.println();
-                        KNN knnAlgorithm = new KNN(3);
-                        Matrix udp_dataset = knnAlgorithm.readFile("E:\\hoc tap\\floodlight\\udp_dataset.csv");
-                        int result = knnAlgorithm.Calculate(udp_dataset, input);
-                        if(result == 1) {
-                            System.out.println("Attack");
-                        }else {
-                            System.out.println("Normal");
-                        }
+//                        detectUDP(dataModel);
                     }else {
                         DataModel dataModel = gson.fromJson(a[1], DataModel.class);
 
                         //drop ip tấn công http get
 //                        doDropIPAttack(dataModel.getList());
 
-                        //Module OCSVM và giải pháp dropICMP
-//                        OCSVM(dataModel.getTOTAL_PKT(), dataModel.getPKT_SIZE_AVG());
+//                        Module OCSVM và giải pháp dropICMP
+                        OCSVM(dataModel.getTOTAL_PKT(), dataModel.getPKT_SIZE_AVG());
 //
 //                        //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
 //                        Fuzzy(dataModel.getPPF(), dataModel.getP_IAT());
@@ -138,6 +119,25 @@ public class ClientSocket implements IFloodlightModule {
         }
     }
 
+    private void detectUDP(Data dataModel){
+        double[] input = {dataModel.getENTROPY_IP_SRC(), dataModel.getENTROPY_PORT_SRC(), dataModel.getENTROPY_PORT_DST(), dataModel.getENTROPY_PROTOCOL(),dataModel.getTotal_pkt()};
+
+        //chạy thuật toán
+        input = normalization(input);
+        for(int i = 0;i < input.length;i++){
+            System.out.print(input[i] +" ");
+        }
+        System.out.println();
+        KNN knnAlgorithm = new KNN(3);
+        Matrix udp_dataset = knnAlgorithm.readFile("E:\\hoc tap\\floodlight\\udp_dataset.csv");
+        int result = knnAlgorithm.Calculate(udp_dataset, input);
+        if(result == 1) {
+            System.out.println("Attack");
+        }else {
+            System.out.println("Normal");
+        }
+    }
+
     private void doDropIPAttack(List<String> ip){
         for(DatapathId datapathId : switchService.getAllSwitchDpids()){
             IOFSwitch sw = switchService.getSwitch(datapathId);
@@ -148,7 +148,7 @@ public class ClientSocket implements IFloodlightModule {
                         .setExact(MatchField.IPV4_SRC,IPv4Address.of(IP))
                         .build();
                 List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
-                fmb.setMatch(match).setIdleTimeout(30);//drop ip attack trong 30s
+                fmb.setMatch(match).setIdleTimeout(30).setPriority(1000);//drop ip attack trong 30s
 
                 FlowModUtils.setActions(fmb, actions, sw);
 
@@ -171,7 +171,7 @@ public class ClientSocket implements IFloodlightModule {
         if(result > 0){
             log.info("Normal");
         }else {
-            doDropFlowICMP();
+//            doDropFlowICMP();
             sendFlowDeleteMessage();
             log.info("Abnormal");
         }
@@ -276,7 +276,7 @@ public class ClientSocket implements IFloodlightModule {
                     numberFlow++;
                     Match match = fse.getMatch();
 
-                    if(fse.getPacketCount().getValue() == 1){
+                    if(fse.getPacketCount().getValue() == 0){
                         numberFlowDeleted++;
                         IOFSwitch sw = switchService.getSwitch(e.getKey());
 
@@ -284,7 +284,6 @@ public class ClientSocket implements IFloodlightModule {
                                 .setOutPort(OFPort.ANY)
                                 .setMatch(match).build();
                         sw.write(flowDelete);
-                        numberFlowDeleted++;
                     }
                 }
             }
