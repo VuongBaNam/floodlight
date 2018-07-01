@@ -150,6 +150,8 @@ public class ClientSocket implements IFloodlightModule {
                 List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
                 fmb.setMatch(match).setIdleTimeout(30).setPriority(1000);//drop ip attack trong 30s
 
+                FlowModUtils.setActions(fmb, actions, sw);
+
                 sw.write(fmb.build());
             }
         }
@@ -195,6 +197,8 @@ public class ClientSocket implements IFloodlightModule {
             List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
             fmb.setMatch(match).setIdleTimeout(Forwarding.FLOWMOD_DEFAULT_IDLE_TIMEOUT);
 
+            FlowModUtils.setActions(fmb, actions, sw);
+
             sw.write(fmb.build());
         }
     }
@@ -209,6 +213,8 @@ public class ClientSocket implements IFloodlightModule {
                     .build();
             List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
             fmb.setMatch(match).setIdleTimeout(Forwarding.FLOWMOD_DEFAULT_IDLE_TIMEOUT).setPriority(1000);
+
+            FlowModUtils.setActions(fmb, actions, sw);
 
             sw.write(fmb.build());
         }
