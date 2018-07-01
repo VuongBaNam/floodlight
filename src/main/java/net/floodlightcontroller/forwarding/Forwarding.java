@@ -153,9 +153,13 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 		Match m = createMatchFromPacket(sw, inPort, cntx);
 		IPv4Address ip_src = m.get(MatchField.IPV4_SRC);
-		if(ip_src != null){
+		IpProtocol protocol = m.get(MatchField.IP_PROTO);
+		if(ip_src != null && protocol != null){
 			if(ip_src.toString().equals(IP_SERVER)) {
 				createFlowIn(sw, inPort, cntx);
+			}
+			if(protocol.getIpProtocolNumber() == IpProtocol.ICMP.getIpProtocolNumber()){
+				createFlowICMP(sw, inPort, cntx);
 			}
 		}
 
@@ -266,6 +270,27 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		} else {
 			log.debug("Destination unknown. Flooding packet");
 			doFlood(sw, pi, cntx);
+		}
+	}
+
+	private void createFlowICMP(IOFSwitch sw,OFPort inPort,FloodlightContext cntx){
+		Match piMatch = createMatchFromPacket(sw, inPort, cntx);
+
+		if(piMatch.get(MatchField.IPV4_DST) != null) {
+			OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
+			Match match = sw.getOFFactory().buildMatch()
+					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+					.setExact(MatchField.IP_PROTO,IpProtocol.ICMP)
+					.build();
+			OFActions actions = sw.getOFFactory().actions();
+			List<OFAction> listActions = new ArrayList<OFAction>(); // set no action to drop
+			OFActionOutput output = actions.buildOutput()
+					.setMaxLen(0xFFffFFff)
+					.setPort(inPort)
+					.build();
+			listActions.add(output);
+			fmb.setMatch(match).setIdleTimeout(30).setPriority(1000).setActions(listActions);
+			sw.write(fmb.build());
 		}
 	}
 

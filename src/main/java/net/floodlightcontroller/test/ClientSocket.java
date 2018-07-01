@@ -99,10 +99,10 @@ public class ClientSocket implements IFloodlightModule {
                         DataModel dataModel = gson.fromJson(a[1], DataModel.class);
 
                         //drop ip tấn công http get
-//                        doDropIPAttack(dataModel.getList());
+                        doDropIPAttack(dataModel.getList());
 
 //                        Module OCSVM và giải pháp dropICMP
-                        OCSVM(dataModel.getTOTAL_PKT(), dataModel.getPKT_SIZE_AVG());
+//                        OCSVM(dataModel.getTOTAL_PKT(), dataModel.getPKT_SIZE_AVG());
 //
 //                        //Module Fuzzy và giải pháp xóa z % flow ưu tiên flow có 1 packet
 //                        Fuzzy(dataModel.getPPF(), dataModel.getP_IAT());
