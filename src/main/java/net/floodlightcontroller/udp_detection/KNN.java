@@ -99,8 +99,7 @@ public class KNN {
     // Merges two subarrays of arr[].
     // First subarray is arr[l..m]
     // Second subarray is arr[m+1..r]
-    void merge(double arr[], int l, int m, int r)
-    {
+    void merge(double arr[], int l, int m, int r) {
         // Find sizes of two subarrays to be merged
         int n1 = m - l + 1;
         int n2 = r - m;
@@ -157,8 +156,7 @@ public class KNN {
 
     // Main function that sorts arr[l..r] using
     // merge()
-    void sort(double arr[], int l, int r)
-    {
+    void sort(double arr[], int l, int r) {
         if (l < r)
         {
             // Find the middle point

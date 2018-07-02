@@ -70,7 +70,6 @@ public class ClientSocket implements IFloodlightModule {
 
     @Override
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-        System.out.println("aaa");
         while (true){
             try{
                 socket = servSocket.accept();

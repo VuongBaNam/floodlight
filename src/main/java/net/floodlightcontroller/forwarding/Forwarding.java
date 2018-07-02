@@ -39,11 +39,7 @@ import net.floodlightcontroller.debugcounter.IDebugCounterService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
-import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.packet.IPv4;
-import net.floodlightcontroller.packet.IPv6;
-import net.floodlightcontroller.packet.TCP;
-import net.floodlightcontroller.packet.UDP;
+import net.floodlightcontroller.packet.*;
 import net.floodlightcontroller.routing.ForwardingBase;
 import net.floodlightcontroller.routing.IRoutingDecision;
 import net.floodlightcontroller.routing.IRoutingService;
@@ -72,7 +68,8 @@ import org.slf4j.LoggerFactory;
 
 public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener {
 	protected static Logger log = LoggerFactory.getLogger(Forwarding.class);
-	public static final String IP_SERVER = "192.168.1.1";
+	public static final String IP_SERVER = "10.0.0.2";
+	public static byte ICMP_TYPE = 0;
 
 	@Override
 	public Command processPacketInMessage(IOFSwitch sw, OFPacketIn pi, IRoutingDecision decision, FloodlightContext cntx) {
@@ -153,13 +150,18 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 		Match m = createMatchFromPacket(sw, inPort, cntx);
 		IPv4Address ip_src = m.get(MatchField.IPV4_SRC);
-		IpProtocol protocol = m.get(MatchField.IP_PROTO);
-		if(ip_src != null && protocol != null){
+		if(ip_src != null ){
 			if(ip_src.toString().equals(IP_SERVER)) {
-				createFlowIn(sw, inPort, cntx);
-			}
-			if(protocol.getIpProtocolNumber() == IpProtocol.ICMP.getIpProtocolNumber()){
-				createFlowICMP(sw, inPort, cntx);
+				TransportPort transportPort = m.get(MatchField.UDP_DST);
+				if(transportPort != null) {
+					if(transportPort.getPort() == 53) {
+						createFlowIn(sw, inPort, cntx);
+					}
+				}
+				if(ICMP_TYPE == 8){
+					createFlowICMP(sw, m);
+					ICMP_TYPE = 0;
+				}
 			}
 		}
 
@@ -273,13 +275,16 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		}
 	}
 
-	private void createFlowICMP(IOFSwitch sw,OFPort inPort,FloodlightContext cntx){
-		Match piMatch = createMatchFromPacket(sw, inPort, cntx);
-
+	private void createFlowICMP(IOFSwitch sw,Match piMatch){
+		OFPort inPort = piMatch.get(MatchField.IN_PORT);
+		IPv4Address ip_src = piMatch.get(MatchField.IPV4_SRC);
+		IPv4Address ip_dst = piMatch.get(MatchField.IPV4_DST);
 		if(piMatch.get(MatchField.IPV4_DST) != null) {
 			OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 			Match match = sw.getOFFactory().buildMatch()
 					.setExact(MatchField.ETH_TYPE, EthType.IPv4)
+					.setExact(MatchField.IPV4_SRC, ip_dst)
+					.setExact(MatchField.IPV4_DST, ip_src)
 					.setExact(MatchField.IP_PROTO,IpProtocol.ICMP)
 					.build();
 			OFActions actions = sw.getOFFactory().actions();
@@ -380,6 +385,9 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 					mb.setExact(MatchField.IP_PROTO, IpProtocol.UDP)
 					.setExact(MatchField.UDP_SRC, udp.getSourcePort())
 					.setExact(MatchField.UDP_DST, udp.getDestinationPort());
+				} else if (ip.getProtocol().equals(IpProtocol.ICMP)) {
+					ICMP icmp = (ICMP)ip.getPayload();
+					ICMP_TYPE = icmp.getIcmpType();
 				}
 			}
 		} else if (eth.getEtherType() == EthType.ARP) { /* shallow check for equality is okay for EthType */
