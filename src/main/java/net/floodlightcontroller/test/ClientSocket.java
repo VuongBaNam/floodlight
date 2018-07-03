@@ -94,7 +94,10 @@ public class ClientSocket implements IFloodlightModule {
                     if(a[0].equals("5S")){
                         Data dataModel = gson.fromJson(a[1], Data.class);
 //                        detectUDP(dataModel);
-                    }else {
+                    }else if(a[0].equals("IP")){
+                        List<String> list = gson.fromJson(a[1],List.class);
+                        doDropIPAttack(list);
+                    } else {
                         DataModel dataModel = gson.fromJson(a[1], DataModel.class);
 
                         //drop ip tấn công http get
