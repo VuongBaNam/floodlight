@@ -69,6 +69,7 @@ import org.slf4j.LoggerFactory;
 public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener {
 	protected static Logger log = LoggerFactory.getLogger(Forwarding.class);
 	public static final String IP_SERVER = "10.0.0.2";
+	public static final String DHCP_SERVER = "10.0.0.2";
 	public static byte ICMP_TYPE = 0;
 
 	@Override
@@ -150,11 +151,17 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
 		Match m = createMatchFromPacket(sw, inPort, cntx);
 		IPv4Address ip_src = m.get(MatchField.IPV4_SRC);
+		TransportPort udp_port_dst = m.get(MatchField.UDP_DST);
 		if(ip_src != null ){
+			if(udp_port_dst != null){
+				if(udp_port_dst.getPort() == 68 && !ip_src.toString().equals(DHCP_SERVER)) {
+					dropIP(ip_src.toString(),sw);
+					return;
+				}
+			}
 			if(ip_src.toString().equals(IP_SERVER)) {
-				TransportPort transportPort = m.get(MatchField.UDP_DST);
-				if(transportPort != null) {
-					if(transportPort.getPort() == 53) {
+				if(udp_port_dst != null) {
+					if(udp_port_dst.getPort() == 53) {
 						createFlowIn(sw, inPort, cntx);
 					}
 				}
@@ -173,7 +180,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 				return;
 			}
 			
-			if (FLOOD_ALL_ARP_PACKETS && 
+			if (FLOOD_ALL_ARP_PACKETS &&
 					IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD).getEtherType() 
 					== EthType.ARP) {
 				log.debug("ARP flows disabled in Forwarding. Flooding ARP packet");
@@ -273,6 +280,21 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 			log.debug("Destination unknown. Flooding packet");
 			doFlood(sw, pi, cntx);
 		}
+	}
+
+	private void dropIP(String ip,IOFSwitch sw){
+		OFFlowMod.Builder fmb = sw.getOFFactory().buildFlowAdd();
+		Match match = sw.getOFFactory().buildMatch()
+				.setExact(MatchField.ETH_TYPE,EthType.IPv4)
+				.setExact(MatchField.IPV4_SRC,IPv4Address.of(ip))
+				.setExact(MatchField.UDP_DST,TransportPort.of(68))
+				.build();
+		List<OFAction> actions = new ArrayList<OFAction>(); // set no action to drop
+		fmb.setMatch(match).setIdleTimeout(30).setPriority(1000);//drop ip attack trong 30s
+
+		FlowModUtils.setActions(fmb, actions, sw);
+
+		sw.write(fmb.build());
 	}
 
 	private void createFlowICMP(IOFSwitch sw,Match piMatch){
